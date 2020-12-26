@@ -1,7 +1,6 @@
 Cam-View is an open source system for capturing video from one or more network-attached video cameras
 and for displaying, storing locally and archiving remotely captured images.
-Cam-View can run on inexpensive PC hardware and draw images from inexpensive cameras. It was devel-
-oped on Ubuntu but should be easily portable to any Linux distribution and with minor effort any Unix-based
+Cam-View can run on inexpensive PC hardware and draw images from inexpensive cameras. It was developed on Ubuntu but should be easily portable to any Linux distribution and with minor effort any Unix-based
 system.
 
 Cam-View is suitable for capturing, storing and viewing security video footage in a small setting such as
