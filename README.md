@@ -19,10 +19,8 @@ browser.
   - A local, high performance, non-persistent ramdisk. This is where images are initially captured.
   - A local persistent disk (solid state SSD or spinning HDD). This is where interactive viewing or
 video downloads come from.
-  - A remote archive. This ensures image retention even if the local storage server is lost or dam-
-aged.
-5. Dealing gracefully with inexpensive, unreliable and poorly connected cameras, for example by period-
-ically attempting to reconnect.
+  - A remote archive. This ensures image retention even if the local storage server is lost or damaged.
+5. Dealing gracefully with inexpensive, unreliable and poorly connected cameras, for example by periodically attempting to reconnect.
 6. Support for multi-tenancy, in both the physical building sense and logical access sense of the word.
 One process can capture video data from multiple cameras in a building. Different URLs are used to
 present video to different tenants – each from a distinct subset of cameras.
