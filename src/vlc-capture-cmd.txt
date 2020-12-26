@@ -1,0 +1,10 @@
+cvlc\
+  rtsp://admin:password@10.1.0.114:554/live/ch0\
+  --video-filter=scene\
+  --scene-prefix=vlc-test-\
+  --scene-format=jpg\
+  --scene-path=/tmp/vlc\
+  --scene-ratio 12\
+  --sout-x264-lookahead=10\
+  --sout-x264-tune=stillimage\
+  --vout=dummy

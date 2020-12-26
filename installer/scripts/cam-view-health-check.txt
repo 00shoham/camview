@@ -1,0 +1,17 @@
+#!/bin/sh
+
+#SCHEDULE: */5 * * * *
+
+MONITORPROC=`ps -ef | grep 'cam-monitor' | grep -v grep`
+if [ -z "$MONITORPROC" ]; then
+  echo "need to restart" > /dev/null
+  FFMPEGPROC=`ps -ef | grep 'ffmpeg' | grep -v grep`
+  if [ -z "$FFMPEG" ]; then
+    echo 'none running' > /dev/null
+  else
+    /usr/bin/killall -1 ffmpeg
+    sleep 1
+  fi
+  echo "Starting cam-monitor"
+  BINDIR/cam-monitor -c ETCDIR/config.ini > /dev/null
+fi

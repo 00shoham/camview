@@ -1,0 +1,64 @@
+\clearpage
+\section{Using \PRODUCT{}}
+
+  Once \PRODUCT{} has been installed and configured, it works as follows:
+
+  \BE
+  \I A process -- \texttt{cam-monitor} runs in the background.
+  \I \texttt{cam-monitor} launches one command per camera to generate
+     image files.  The usual command is \texttt{ffmpeg}.
+  \I The image generator produces image files on a RAMDISK.  This is
+     normally mounted in \texttt{/mnt/ramdisk}.
+  \I The \texttt{cam-monitor} process inspects images as they are
+     generated and when it either detects motion or a timeout
+     has passed, it stores images in a backup location, such as
+     \texttt{/data/security}.
+  \I Periodically, \texttt{cam-monitor} may also run a command to
+     copy recent images from the backup location to a remote
+     location, for example to protect against damage to or loss of
+     the video surveillance system.
+  \I A web server is configured on the video surveillance system.
+     This is normally Apache2.
+  \I Users can view recently backed up images using a web browser.
+     The usual URL for this is \URL{http://localhost/cam-bin/cam-view}.
+  \I Users can view the status of the system at
+     \URL{http://localhost/cam-bin/cam-status}.
+  \I With either \texttt{cam-view} or \texttt{cam-status}, users can 
+     click on a single image to zoom in, and click on arrow icons on
+     either side of a zoomed-in image to step forward or backwards
+     through stored images.  Clicking anywhere else in the zoomed in
+     image closes the zoom-in popup view.
+  \I Users can download recorded images or video at
+     \URL{http://localhost/cam-bin/download-recordings}.
+  \I A number of shell scripts are scheduled to run periodically:
+     \BI
+     \I \texttt{/usr/local/bin/cam-view-clean-download.sh} cleans
+        old files from the download folder.
+     \I \texttt{/usr/local/bin/cam-view-health-check.sh} checks
+        that \texttt{cam-monitor} is running and, if not, starts it.
+     \I \texttt{/usr/local/bin/cam-view-archive.sh} cleans up old
+        files in the backup folder.  First, \texttt{.jpg} image 
+        files older than two days are stored in a \texttt{.tar}
+        archive.  Second, files older than 21 days are deleted.
+        Finally, any log files older than 10 days are removed.
+     \EI
+  \I Command-line utilities are also included.  These
+     provide usage instructions via the \texttt{-h} argument:
+     \BI
+     \I \texttt{cam-archive} -- archive old \texttt{.jpg} images into
+        \texttt{.tar} archives.
+     \I \texttt{cam-config} -- test parsing of configuration files.
+     \EI
+  \I Static web documents -- including image files and JavaScript
+     libraries -- are normally placed in \texttt{/var/www/html/cam-view}
+     and accessed at \URL{http://localhost/cam-view/}.
+  \I CGI programs and their configuration files are normally placed in
+     \texttt{/var/www/cam-view-bin} and accessed at
+     \URL{http://localhost/cam-bin/}.
+  \I HTML documents for the UI are constructed by the CGI programs from
+     template files, also installed in \texttt{/var/www/cam-view-bin}.
+  \I The web CGI programs, the \texttt{cam-monitor} process, the
+     image capture commands and the scheduled jobs all run in the
+     security context of an (unprivileged) user, normally \texttt{camview}.
+  \EE
+

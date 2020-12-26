@@ -1,0 +1,12 @@
+The docs for this project are written in LaTeX.  You need the following
+packages to compile docs into a PDF:
+
+ * texlive-latex-base
+ * texlive-extra-utils
+ * texlive-latex-extra
+
+On Ubuntu and similar distributions, you can type:
+
+ * apt intsall texlive-latex-base texlive-extra-utils texlive-latex-extra
+
+Someone should provide equivalent instructions for other distributions...

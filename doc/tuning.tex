@@ -1,0 +1,237 @@
+\newcommand{\Variable}[4]%
+  {%
+  \begin{tabularx}{\linewidth}{lY}
+  \emph{Parameter}
+  & #1
+  \\
+  \emph{Built-in default}
+  & #2
+  \\
+  \emph{Global default}
+  & \texttt{#3}
+  \\
+  \emph{Per-camera default}
+  & \texttt{#4}
+  \\
+  \end{tabularx}
+  }
+
+\clearpage
+\section{Tuning}
+\label{tuning}
+
+  \PRODUCT{} is quite configurable, in particular in relation to the
+  motion detection algorithm.  To understand the parameters, it is
+  important to first understand the algorithm.
+
+  \subsection{Motion detection overview}
+
+    \PRODUCT{} compares sequential pairs of images, which it reads from
+    JPEG files on the filesystem (typically on a RAM disk).  For each
+    such pair, it tries to determine whether there has been motion, by
+    seeing if the images are sufficiently different.
+
+    The challenge with motion detection is that images come in via a lossy
+    file format (JPEG) and have noise from other sources, including RTSP
+    network transport over (lossy) UDP, changing light levels, optical
+    artifacts and natural small movements, such as moving shadows or
+    rustling leaves in outdoor images.  No two images are identical,
+    even if they encode two scenes that are essentially the same.
+
+    The motion detection algorithm is designed to flag image pairs
+    where there has been substantial change, while minimizing "false
+    negatives" (failed to detect actual motion) and "false positives"
+    (flagged motion where there was just noise).
+
+    The motion detection algorithm also has to be quite fast.  Consider
+    a deployment with just 10 cameras, each of which produces a
+    "full HD" color image -- i.e., 1920 pixels wide, 1080 pixels
+    tall, 3 bytes per pixel.  This means that comparing just two
+    images requires processing 1920 x 1080 x 3 x 2 = 12,441,600
+    bytes of data.  Comparing a pair of images across each of 10 cameras
+    means processing 120MB of data.  If images are acquired at
+    just 1 image/second, this is 120MB/second (7.2GB/minute).
+    This is all in-memory, as the raw image files are JPEG, typically
+    about 10x smaller than the raw bitmaps.
+
+  \subsection{Motion detection algorithm}
+
+    Motion detection is a multi-step process, which proceeds as follows:
+
+    \BE
+    \I \textbf{Increase brightness of dark images:}
+
+       First, check if either image is too dark.  If so, increase the
+       luminosity of both images by the same amount.  Luminosity is
+       increased by calculating the logarithm of each of the red, green
+       and blue components of each pixel, multiplying by a factor and
+       taking the exponent of the result.
+
+    \I \textbf{Subtract the images to generate a gray-scale:}
+
+       Create a gray-scale image, where each pixel is a measure
+       of how far the colors of the corresponding pixels in the
+       two images are from one another.  There are details in how
+       this comparison is calculated that make it more useful in
+       noisy images:
+
+       \BI
+       \I Color distance = the sum of the difference between red,
+          green and blue colors of the pixels.  All difference
+          values are absolute (i.e., no negative values).
+
+       \I If the difference between any of the red, blue or green
+          components of two pixels is less than a threshold amount,
+          it is assumed to be "near enough" to zero and ignored.
+
+       \I Color distance is compared to each neighboring pixel as
+          well.  In other words, each pixel in one image is compared to
+          nine pixels in the other image.
+          If the images are noisy, a visual element may appear in
+          one pixel in one image and a nearby pixel in the other
+          image, and such differences can be safely ignored.
+          The smallest difference between a pixel in one image
+          and its neighbors in the other image is used for the
+          gray-scale output.
+
+       \I To minimize computational cost, the 1-pixel edges of the
+          input images are assumed to be identical and their differences
+          are set to "0."  This is not actually true, but we don't care
+          enough to incur the extra computational expense of treating
+          edge pixels, which have fewer than 8 neighbors, differently
+          than "inside" pixels.
+       \EI
+
+    \I \textbf{Remove light or bright "speckles" from the difference:}
+
+       The difference image may still be a bit noisy, with occasional
+       bright pixels surrounded by dark pixels or dark pixels surrounded
+       by white ones.  Such one-off pixels are just noise and are removed.
+       If the average brightness of neighboring pixels is above a
+       light threshold and the pixel is below a dark threshold, then
+       the pixel brightness is made the same as the average brightness
+       of its neighbors.  Similarly, if the average brightness of a
+       pixel is below a dark threshold while the neighbors are above
+       a light threshold, it is made the same as the average brightness
+       of its neighbors.
+
+    \I \textbf{Reduce the gray-scale to a smaller black and white checkerboard:}
+
+       The gray-scale image is reduced by a factor of N, where each NxN
+       gray-scale pixels are mapped to a single pixel which is either
+       black or white.  For each of the NxN pixels in the gray-scale,
+       a value of 1 or 0 is assigned based on whether the brightness
+       of that pixel is above a threshold.  Next, corresponding the
+       checkerboard pixel is set to 1 if the total number of NxN pixels
+       set to 1 is above a second threshold.  Essentially, a checkerboard
+       pixel is white if a sufficient number of the NxN gray-scale pixels
+       are above a brightness threshold.
+
+    \I \textbf{Count the white pixels:}
+
+       Finally, the number of white pixels in the resulting checkerboard
+       is counted.  If they represent at least a threshold
+       percent of the image area, then the image pair is considered
+       to have motion.  If they are below the threshold, then the
+       pair of images are considered to be static.
+    \EE
+
+  \subsection{Motion detection parameters}
+
+    The algorithm described above mentions various parameters.
+    Each parameter has a built-in default plus the configuration
+    file can specify either global default values or per-camera
+    values for each parameter.  The parameters are as follows:
+
+    \BE
+    \I \textbf{Increase brightness of dark images:}
+
+       \Variable{The pixel value of 'dark' below which image
+                 brightness will be increased.  Values are out of
+                 255(red) + 255(green) + 255(blue) = 765.}
+                {40}
+                {DEFAULT\_COLOR\_DARK}
+                {COLOR\_DARK}
+
+       \Variable{How much to boost the brightness of dark pixels.
+                 New brightness (per color) = exp( log( old brightness) * factor ).}
+                {1.5}
+                {DEFAULT\_DARK\_BRIGHTNESS\_BOOST}
+                {DARK\_BRIGHTNESS\_BOOST}
+
+    \I \textbf{Subtract the images to generate a gray-scale:}
+
+       \Variable{Minimum meaningful difference between the red, green
+                 or blue components of corresponding pixels in two
+                 images.}
+                {40}
+                {DEFAULT\_COLOR\_DIFF\_THRESHOLD}
+                {COLOR\_DIFF\_THRESHOLD}
+
+    \I \textbf{Remove light or bright "speckles" from the difference:}
+
+       \Variable{Maximum brightness of pixel in an image,
+                 out of 765 (R+G+B), if the pixel is to be considered
+                "dark."}
+                {30}
+                {DEFAULT\_DESPECKLE\_DARK\_THRESHOLD}
+                {DESPECKLE\_DARK\_THRESHOLD}
+
+       \Variable{Minimum average brightness of neighboring pixels,
+                 out of 765, for those pixels to be considered "bright."}
+                {200}
+                {DEFAULT\_DESPECKLE\_NONDARK\_MIN}
+                {DESPECKLE\_NONDARK\_MIN}
+
+       \Variable{Minimum brightness of pixel in an image,
+                 out of 765 (R+G+B), if the pixel is to be considered
+                 "light."}
+                {140}
+                {DEFAULT\_DESPECKLE\_BRIGHT\_THRESHOLD}
+                {DESPECKLE\_BRIGHT\_THRESHOLD}
+
+       \Variable{Maximum average brightness of neighboring pixels,
+                 out of 765, if they are to be considered "dark."}
+                {60}
+                {DEFAULT\_DESPECKLE\_NONBRIGHT\_MAX}
+                {DESPECKLE\_NONBRIGHT\_MAX}
+
+    \I \textbf{Reduce the gray-scale to a smaller black and white checkerboard:}
+
+       \Variable{Size of a square in the difference gray-scale image that
+                 will be mapped to a single pixel in the black-and-white
+                 checkerboard.  Measured in pixels (both width and height).}
+                {8}
+                {DEFAULT\_CHECKERBOARD\_SQUARE\_SIZE}
+                {CHECKERBOARD\_SQUARE\_SIZE}
+
+       \Variable{Minimum brightness (out of 255) of a pixel in the
+                 gray-scale difference image that constitutes a "light"
+                 pixel.}
+                {100}
+                {DEFAULT\_CHECKERBOARD\_MIN\_WHITE}
+                {CHECKERBOARD\_MIN\_WHITE}
+
+       \Variable{Minimum number of "light" pixels (as above) in the
+                 NxN square area of the gray-scale difference image,
+                 before a pixel in the "checkerboard" black and white
+                 image should be set to "on."  Note that this is out
+                 of a maximum of CHECKERBOARD\_SQUARE\_SIZE squared.}
+                {33}
+                {DEFAULT\_CHECKERBOARD\_NUM\_WHITE}
+                {CHECKERBOARD\_NUM\_WHITE}
+
+       \Variable{Percentage of the checkerboard pixels that are lit up
+                 as "white" using the above method before the
+                 two images that formed the original difference
+                 gray-scale are considered to be different enough
+                 to indicate motion.  For example, 0.02\% in a
+                 1920x1080 image which is sub-sampled into 8x8
+                 blocks means
+                 \mbox{0.0002 $\times$ 1920 $\times$ 1080 / ( 8 $\times$ 8 ) = 6 pixels.}}
+                {0.02\%}
+                {DEFAULT\_CHECKERBOARD\_PERCENT}
+                {CHECKERBOARD\_PERCENT}
+
+    \EE
+

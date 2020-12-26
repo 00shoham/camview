@@ -1,0 +1,12 @@
+#!/bin/sh
+
+#SCHEDULE: */5 * * * *
+
+DLDIR=`BINDIR/cam-config -c ETCDIR/config.ini -printvar DOWNLOAD_DIR`
+if [ -d "$DLDIR" ]; then
+  FILES=`find "$DLDIR" \( -name '*.tar' -or -name '*.mp4' \) -and -mmin +30`
+  for f in $FILES; do
+    echo "Removing $f"
+    rm -f "$f"
+  done
+fi

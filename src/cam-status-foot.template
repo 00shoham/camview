@@ -1,0 +1,25 @@
+    <div class="summary">
+      <b>Number of cameras with problems: %BADCAMERAS%</b>
+         &nbsp; &nbsp; &nbsp; &nbsp;
+      <b>Number of problems found: %PROBLEMS%</b>
+    </div>
+
+    <div id="label" style="position: fixed; z-index:100; display:none;">
+    </div>
+
+    <div id="prev" style="position: fixed; z-index:100; display:none;">
+      <p style="margin:auto"><a href="#" onclick="PrevImage();"><img src="/cam-view/left-small.png"/></a></p>
+    </div>
+
+    <div id="next" style="position: fixed; z-index:100; display:none;">
+      <p style="margin:auto"><a href="#" onclick="NextImage();"><img src="/cam-view/right-small.png"/></a></p>
+    </div>
+
+    <div id="links" style="padding:20px; display:block;">
+      <p><a href="download-recordings">Download recordings</a>
+         &nbsp; &nbsp; &nbsp; &nbsp;
+         <a href="cam-view">Live view</a></p>
+    </div>
+
+  </body>
+</html>

@@ -1,0 +1,12 @@
+You need the following packages:
+
+  * gcc
+    (apt install gcc)
+  * make
+    (apt install make)
+  * libjpeg
+    (apt install libjpeg-dev)
+  * ffmpeg
+    (apt install ffmpeg)
+
+

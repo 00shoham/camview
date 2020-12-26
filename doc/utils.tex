@@ -1,0 +1,105 @@
+\clearpage
+\section{Command-line utilities and shell scripts}
+\label{cli}
+
+  \PRODUCT{} includes a handful of command-line programs and shell
+  scripts which are useful in the operation of the system.  These are
+  described below.
+
+  \subsection{cam-archive}
+
+    \PRODUCT{} accumulates large numbers of JPEG image files in the
+    backup folder.  Over time, these will fill all available drive
+    space.  Moreover, on most filesystems, very large folders have
+    poor runtime performance.
+
+    It makes sense to (a) collect large numbers of small image files
+    into a few large archive files and (b) delete older archive files.
+    These two tasks are the job of cam-archive:
+
+    \texttt{cam-archive} must be supplied with a path to the \PRODUCT{}
+    configuration file:
+
+    \texttt{cam-archive -config CONFIGFILE}
+
+    All other arguments are optional.  They include:
+
+    \BI
+    \I \texttt{-camera \emph{ID}} -- operate on a single, specified
+       camera.  Otherwise, \texttt{cam-archive} operates on all configured
+       cameras.
+    \I \texttt{-days \emph{N}} -- operate on a data from N days in
+       the past.  The default is 0, meaning today.
+    \I \texttt{-range \emph{N1} \emph{N2}} -- operate on a data from multiple
+       days, starting with N1 days ago and until N2 days ago.  For example
+       \texttt{-range 0 5}.
+    \I \texttt{-count} -- print the number of image files per camera.
+    \I \texttt{-tar} -- create one or more ".tar" archive files of images
+       matching the above conditions.  There will be one archive file
+       per day.  The file9s) will be placed in camera-specific backup
+       folders and named after the date.
+    \I \texttt{-remove} -- delete \texttt{.jpg} files that were archived.
+    \EI
+
+  \subsection{cam-view-archive.sh}
+
+    A simple shell script that:
+
+    \BI
+    \I Archives images that are 2 or more days old, for each configured camera.
+    \I Deletes archive files that are 21 or more days old.
+    \I Deletes log files that are 10 days or older on the RAM disk.
+    \EI
+
+    This shell script is normally scheduled to run periodically as
+    the \texttt{camview} user.
+
+  \subsection{cam-config}
+
+    Used to diagnose configuration files and to extract the values of
+    configuration variables.
+
+    The sole mandatory argument is \texttt{-c \emph{configfile}} - which
+    specifies the configuration file on which the program should operate.
+
+    The two optional arguments, used separately (not together) are:
+
+    \BI
+    \I \texttt{-listincludes} -- prints a list of files included by the
+       main configuration file.  This is useful in scripts that copy
+       configuration files, such as at installation time, as it tells
+       the script what other files are required.
+    \I \texttt{-printvar} -- prints the value of a single variable,
+       including any expansions.  This is useful to locate folders,
+       such as the \texttt{BASE\_DIR} or \texttt{BACKUP\_DIR}, for use
+       in scripts such as \texttt{cam-view-archive.sh}.
+    \EI
+
+    This program will also print errors if a configuration file
+    cannot be parsed.  If the configuration file includes the
+    \texttt{\#print} directive, it will also cause the fully expanded
+    configuration to be printed out to the specified file.
+
+  \subsection{cam-view-clean-download.sh}
+
+    When users download archives or movie files of captured images,
+    the downloaded material is stored in the \texttt{downloads} folder,
+    under the \texttt{BACKUP\_DIR} folder specified in the configuration
+    file.  This shell script is used to find and remove older download
+    files -- by default those that are at least 30 minutes old.
+
+    This shell script is normally scheduled to run periodically as
+    the \texttt{camview} user.
+
+  \subsection{cam-view-health-check.sh}
+
+    This is used to check that \texttt{cam-monitor} is running and, if
+    not, to stop any running ffmpeg jobs and restart it.  This is also
+    how \texttt{cam-monitor} is usually started - by a scheduled cron job
+    that runs this script every few minutes as the user \texttt{camview}.
+
+  \subsection{cam-view-stop.sh}
+
+    This is used to stop any running \texttt{ffmpeg} and
+    \texttt{cam-monitor} jobs.  It is normally only used in the context
+    of system diagnostics or \PRODUCT{} software development.

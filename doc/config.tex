@@ -1,0 +1,223 @@
+\clearpage
+\section{Configuration}
+\label{config}
+
+  \PRODUCT{} is configured using a text configuration file.
+  Conventionally, this is called \texttt{config.ini}.  In the
+  CGI directory, this is the mandatory filename.
+
+  The configuration file specifies both global parameters and a list of
+  cameras, each with its own parameters.  The file format
+  supports comments, file inclusion and simple macro expansion.
+
+  \subsection{Syntax}
+
+    \BI
+    \I Items in the configuration file are written as single lines of text,
+       in the form \emph{variable}=\emph{value}.  Values can include spaces and
+       punctuation marks, and are ended at the end of each line.
+    \I If the combination of a variable and value is very long,
+       a configuration line can be split over two or more lines by
+       ending all but the last line of text with a \BS{} character.
+    \I Comments are lines that begin with a \# character.
+    \I If a \emph{variable} is not one that the
+       system understands, it is stored and can be referred to later
+       in the file by the expression \emph{\$variable}.
+    \I Secondary configuration files are incorporated into the main one
+       via the \texttt{\#include "}\emph{filename}\texttt{"} directive.
+    \EI
+
+    The following block of text illustrates this syntax:
+
+    \begin{verbatim}
+CONFIG_NAME=My Video Surveillance System
+EPHEMERAL=/mnt/ramdisk/security
+PERSISTENT=/data/security
+BASE_DIR=$EPHEMERAL
+BACKUP_DIR=$PERSISTENT
+DOWNLOAD_DIR=$PERSISTENT/download
+LOG_FILE=$EPHEMERAL/monitor.log
+CGI_LOG_FILE=$EPHEMERAL/cgi.log
+DEFAULT_MINIMUM_CAPTURE_INTERVAL=600
+BACKUP_COMMAND=/bin/tar cf - %FILES%\
+  | /usr/bin/ssh backup@my-backup-service.org "cd /data/security; tar xpf -"
+DEFAULT_MINIMUM_CAPTURE_INTERVAL=600
+DEFAULT_MOTION_FRAMES=3
+
+CAPFILE=test-image-%08d.jpg
+# Use the same command for every camera of this type.  Just
+# substitute the IP address or hostname, user and password
+# in the RTSP URL:
+BESDER_CAPTURE=/usr/bin/ffmpeg\
+  -y\
+  -i rtsp://$IPADDR:554/user=$USER_password=$PASS_channel=1_stream=1.sdp\
+  -r 1\
+  -f image2\
+  -vframes 99999999\
+  $CAPFILE
+
+# Here is the first camera:
+CAMERA=front-entry
+USER=admin
+PASS=admPASS
+IPADDR=192.168.1.20
+COMMAND=$BESDER_CAPTURE
+
+# Second camera:
+# uses the same creds as the front camera so no need to update those.
+CAMERA=back-entry
+IPADDR=192.168.1.21
+COMMAND=$BESDER_CAPTURE
+    \end{verbatim}
+
+  \subsection{Global parameters}
+
+    Each configuration file must specify the following parameters:
+
+    \BI
+    \I \texttt{CONFIG\_NAME} -- The name of the system.  This is displayed
+       in the web UI.\\
+       Example usage: \texttt{CONFIG\_NAME=My Video Surveillance System}
+
+    \I \texttt{BASE\_DIR} -- The directory where real time image capture
+       will take place.  It is recommended that a RAM disk be created
+       and mounted in \texttt{/mnt/ramdisk} and the base directory be
+       defined as\\
+       \texttt{/mnt/ramdisk/security}. \\
+       Example usage: \texttt{BASE\_DIR=/mnt/ramdisk/security}
+
+    \I \texttt{BACKUP\_DIR} -- The directory to which images are copied
+       if motion is detected or time has elapsed.  The \texttt{/data/security}
+       directory is suggested.\\
+       Example usage: \texttt{BACKUP\_DIR=/data/security}
+
+    \I \texttt{DOWNLOAD\_DIR} -- A directory where archives or movie files
+       are temporarily placed, before being downloaded to an authorized
+       browser.  Since these can be quite large and a RAM disk is usually
+       small, do not use the value set for \texttt{BASE\_DIR}.  A
+       sub-folder of \texttt{BACKUP\_DIR} is recommended.\\
+       Example usage: \texttt{DOWNLOAD\_DIR=/data/security/downloads}
+
+    \I \texttt{LOG\_FILE} -- The full path to a filename where debug
+       and event log information will be written.  Since this can be quite
+       a busy file whose contents need not be retained for a long time,
+       a folder in \texttt{BASE\_DIR}, on a RAM disk, is a good idea.\\
+       Example usage: \texttt{LOG\_FILE=/mnt/ramdisk/security/monitor.log}
+
+    \I \texttt{CGI\_LOG\_FILE} -- Like \texttt{LOG\_FILE} but used by
+       the web UI of the system, rather than the video capture process.
+       Keeping this in the RAM disk also makes sense.\\
+       Example usage: \texttt{CGI\_LOG\_FILE=/mnt/ramdisk/security/cgi.log}
+    \EI
+
+    The following parameters are not mandatory but can also be specified:
+
+    \BI
+    \I \texttt{DEFAULT\_MOTION\_FRAMES} -- If a camera does not specify
+       a different value, copy this many image files (frames) from
+       the \texttt{BASE\_DIR} folder to the \texttt{BACKUP\_DIR}
+       folder after detecting motion.\\
+       Example usage: \texttt{DEFAULT\_MOTION\_FRAMES=3}
+
+    \I \texttt{DEFAULT\_MINIMUM\_CAPTURE\_INTERVAL} -- Even if no motion is
+       detected, an image will be copied from the \texttt{BASE\_DIR} location
+       to the \texttt{BACKUP\_DIR} location periodically.  The period is
+       specified in seconds using this directive.\\
+       Example usage: \texttt{DEFAULT\_MINIMUM\_CAPTURE\_INTERVAL=600}
+
+    \I \texttt{BACKUP\_COMMAND} -- If there is any concern about the
+       video monitoring server itself being damaged or stolen, images
+       can be copied from the \texttt{BACKUP\_DIR} directory to another
+       location on the network, such as a VM in the cloud.  This is
+       the command used to copy a set of files from the video server
+       to the off-site backup location.
+
+       The \%FILES\% macro is expanded
+       into a list of filenames of the form \emph{cameraID/imagefile-with-timestamp.jpg}.
+
+       The backup command is executed with the current working directory
+       being \texttt{BACKUP\_DIR}.
+
+       Example usage:\\
+       \texttt{BACKUP\_COMMAND=/bin/tar cf - \%FILES\%} \BS{}\\
+       \mbox{}~~\texttt{| /usr/bin/ssh \emph{backupUser}@\emph{backupSystem} "cd /data/security; tar xpf -"}
+
+       Note that in the above example, an SSH trust relationship should exist, to
+       eliminate password prompts.
+
+    \I \texttt{FILES\_TO\_CACHE} -- It would be inefficient to run
+       \texttt{BACKUP\_COMMAND} once per image.  This parameter tells
+       \PRODUCT{} how many files (approximately) it should collect before
+       copying images to the remote server.\\
+       Example usage: \texttt{FILES\_TO\_CACHE=50}
+    \EI
+
+  \subsection{Defining cameras}
+
+    Each camera is introduced in the configuration file with at least
+    the following two commands:
+
+    \BI
+    \I \texttt{CAMERA} -- The name of the camera.  It is recommended that
+       camera names consist only of letters, digits, periods and the dash
+       (-) character. All subsequent parameters relate to this camera.\\
+       Example usage: \texttt{CAMERA=My-first-camera}
+
+    \I \texttt{COMMAND} -- The command that \PRODUCT{} should run to
+       fetch image files from this camera.  This is normally the
+       \texttt{ffmpeg} command acquiring a video stream from an RTSP
+       service on the camera.  For example, this works for many
+       "BESDER" branded cameras:\\
+       \texttt{COMMAND=/usr/bin/ffmpeg -y}\BS{}\\
+       \mbox{}~~\texttt{  -i rtsp://\emph{ip-address}:554/user=\emph{UU}\_password=\emph{PP}\_channel=1\_stream=1.sdp}\BS{}\\
+       \mbox{}~~\texttt{  -r 1}\BS{}\\
+       \mbox{}~~\texttt{  -f image2}\BS{}\\
+       \mbox{}~~\texttt{  -vframes 99999999}\BS{}\\
+       \mbox{}~~\texttt{  test-image-\%08d.jpg}
+
+       \NOTE{\PRODUCT{} requires that image files generated by the
+             capture process begin with \texttt{text-image-} and end
+             in \texttt{.jpg}.}
+    \EI
+
+    The parameters that follow a \texttt{CAMERA} line pertain to just
+    that camera.  In addition to the mandatory \texttt{COMMAND} line,
+    there are optional parameters that can be included:
+
+    \BI
+    \I \texttt{MINIMUM\_CAPTURE\_INTERVAL} -- same as
+       \texttt{DEFAULT\_MINIMUM\_CAPTURE\_INTERVAL} but just for
+       the current camera.
+    \I \texttt{MOTION\_FRAMES} -- same as
+       \texttt{DEFAULT\_MOTION\_FRAMES} but just for
+       the current camera.
+    \I \texttt{DEBUG} -- set to \texttt{true} or \texttt{false} --
+       increases logging for the capture and image processing
+       performed for this camera.  Can generate a lot of data so
+       do not run with this for a long time -- the RAM disk can
+       fill up.
+    \EI
+
+  \subsection{Debugging configuration files}
+
+    Because of multi-line inputs, variable expansion and file
+    inclusion, it is easy to make mistakes in the configuration
+    file.  A mechanism is provided to help diagnose such problems.
+    Just add the following directive at the end of the main
+    configuration file:
+
+    \texttt{\#print "\emph{debug-output-filename}"}
+
+    When the \texttt{cam-monitor} command is run using a configuration
+    file that ends in this directive, the configuration file, with all
+    includes, long lines and macros expanded out, to be printed to the
+    file \emph{filename}.  The monitor will then exit rather than trying
+    to connect to cameras.  Run the monitor as follows to do this:
+
+    \texttt{cam-monitor -c \emph{main-config-filename}}
+
+    You can then inspect the contents of \emph{debug-output-filename}.
+    Just don't forget to remove this line from your configuration file
+    before trying to move your setup to production, as this command
+    terminates the monitor after printing the diagnostic file.
+

@@ -1,0 +1,47 @@
+<html>
+  <head>
+    <meta charset="us-ascii">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous"/>
+    <title>%TITLE%</title>
+    <style>
+      html
+        {
+        font-size: 20px;
+        padding: 20px;
+        }
+    </style>
+    <script type="text/javascript">
+      /* global array of available cameras */
+      %CAMERAS%
+    </script>
+    <script type="text/javascript" src="/cam-view/cam-view.js"></script>
+  </head>
+  <body onload="CamViewOnLoad();">
+    <h1>%TITLE%</h1>
+
+    <div id="details" style="position: fixed; z-index:100; width:auto; max-width:85vw; height:auto; max-height:80vw; display:none; left:50%; margin-left:-42.5vw; top:60px; border:3px solid #933;">
+      <p style="margin:auto"><a href="#" onclick="HideDetails();"><img style="max-width:100%; max-height:100%;" id="photo-details" src="#"/></a></p>
+    </div>
+
+    <div id="cameras">
+    </div>
+
+    <div id="label" style="position: fixed; z-index:100; display:none;">
+    </div>
+
+    <div id="prev" style="position: fixed; z-index:100; display:none;">
+      <p style="margin:auto"><a href="#" onclick="PrevImage();"><img src="/cam-view/left-small.png"/></a></p>
+    </div>
+
+    <div id="next" style="position: fixed; z-index:100; display:none;">
+      <p style="margin:auto"><a href="#" onclick="NextImage();"><img src="/cam-view/right-small.png"/></a></p>
+    </div>
+
+    <div id="links" style="padding:20px; display:block;">
+      <p><a href="download-recordings">Download recordings</a>
+         &nbsp; &nbsp; &nbsp; &nbsp;
+         <a href="cam-status">System status</a></p>
+    </div>
+
+  </body>
+</html>

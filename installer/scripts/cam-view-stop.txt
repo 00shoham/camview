@@ -1,0 +1,18 @@
+#!/bin/sh
+
+
+MON=`ps -ef | grep cam-monitor | grep -v grep | awk '{print $2}'`
+for p in $MON; do
+  kill -9 $p
+done
+
+FFMPEG=`ps -ef | grep ffmpeg | grep -v grep | awk '{print $2}'`
+for p in $FFMPEG; do
+  kill -1 $p
+done
+
+LOOP=`ps -ef | grep grab-loop | grep -v grep | awk '{print $2}'`
+for p in $LOOP; do
+  kill -1 $p
+done
+

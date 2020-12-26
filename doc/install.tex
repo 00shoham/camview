@@ -1,0 +1,523 @@
+\clearpage
+\section{Installation}
+
+  There are a number of elements required to run \PRODUCT{}:
+
+  \BE
+  \I A user and group in whose security context the software runs.
+  \I A video acquisition program which
+     connects to each camera, fetches a video stream and writes
+     image files on the filesystem.  The installer
+     is able to install ffmpeg, which is commonly used.
+  \I A RAMDISK where image files are stored, to minimize I/O cost.
+  \I A backup folder, where images of interest are stored.
+  \I A web server, used to present all user interfaces.  The installer
+     is able to install and configure Apache2.
+  \I A variety of CGI programs that run under the web server,
+     to (a) display the most recently stored image from each camera,
+     (b) to rewind to previous images, (c) to check on the status of
+     the system and all cameras and (d) to download video files or
+     archives that contain individual image files.
+  \I A variety of scripts and binary programs for archiving and cleaning
+     up image files and log files.
+  \EE
+
+  \subsection{Simple installation}
+  \label{simple}
+
+    There is a fairly extensive installation script, which can configure
+    all of the above items.  Like the rest of \PRODUCT{}, this script was
+    developed and tested on an Ubuntu Linux system.  It may work on other
+    systems, with minor modifications, but has not been tested outside
+    of this platform.
+
+    To configure the system, first create a configuration file as
+    described in \FULLREF{config}.  The example provided is a good starting
+    point.  The installer will, by default, look for a configuration file
+    called \texttt{config.\emph{hostname}} where \emph{hostname} is the
+    output of the \texttt{uname -n} command on your system.  To keep things
+    simple, use this filename for now.
+
+    You must specify at least one camera in your configuration file.
+    Video capture is typically performed using the \texttt{ffmpeg}
+    command, which in turn requires an RTSP URL for your camera.
+
+    Some tips for configuring cameras:
+
+    \BE
+    \I Most cameras are activated using a smart phone app, so start there,
+       to attach your camera to your wired or WiFi network.
+    \I If you can reach the camera with an Ethernet cable, do so.
+       This usually yields better image quality and more consistent
+       results than WiFi, which is vulnerable to range issues and
+       interference.
+    \I Do set a user ID and password on your camera.  Consider using the
+       same credentials on all your cameras, for simplicity.  Note these
+       credentials, as they will be incorporated into the RTSP URL
+       later.
+    \I If the camera uses DHCP for its network address, adjust your
+       DHCP server, which might be on the video surveillance server itself
+       (\texttt{isc-dhcp-server} works well) or possibly on your WiFi
+       router to assign the camera a static IP address. Otherwise, the
+       system will stop working whenever the camera gets a new address!
+    \I Refer to your camera's documentation or search the web for a
+       suitable URL for your brand and model of camera.  This is a good
+       resource for some cameras: \URL{https://security.world/rtsp/}.
+    \I Formulate your RTSP URL with your camera's IP address (or hostname
+       if you've added it to /etc/hosts or a DNS service), port number,
+       login ID and password.
+    \I Test the RTSP URL with a program such as ffmpeg (command-line)
+       or vlc (GUI).  For example:\\
+       \texttt{ffmpeg -y -i rtsp://\emph{Your-URL} test.mp4} -- this
+       should generate a video file in test.mp4 (quit with Ctrl-C) or
+       error messages.
+    \I Make sure you have a working RTSP URL before incorporating it
+       into the configuration file.
+    \EE
+
+    Once you have written your configuration file and placed it in the
+    configuration folder, test it:
+
+    \texttt{%
+    cd src\\
+    make\\
+    cd ../config\\
+    ../src/cam-config -c config.\emph{servername}}
+
+    If the configuration file is good, this will print nothing.
+    If there are problems, you will see an error message.
+
+    Once you have a good camera RTSP URL and a good configuration file,
+    install the software:
+
+    \texttt{%
+    cd src\\
+    make\\
+    cd installer\\
+    ./install.sh}
+
+    You need to do this as a user with permission to run commands as
+    \texttt{root} using the \texttt{sudo} command and you will be prompted
+    for your password, as the installer needs to perform various actions
+    as \texttt{root}.
+
+    This will:
+    \BI
+    \I Install any missing packages, such as apache2 or ffmpeg.
+    \I Create a user called \texttt{camview}.
+    \I Install binaries from the \texttt{src} folder to \texttt{/usr/local/bin}.
+    \I Create a backup folder and a download folder.
+    \I Copy the configuration file to \texttt{/usr/local/etc/cam-view/}.
+    \I Create and mount a RAMDISK in \texttt{/mnt/ramdisk}, where image
+       files will be captured.
+    \I Configure Apache2 to support CGI programs and create a CGI URL
+       for the software at \URL{http://localhost/cam-bin}.  The files
+       for this are in \texttt{/var/www/cam-view-bin}.
+    \I Install shell scripts in \texttt{/usr/local/bin/cam-*.sh} and
+       schedule some to run periodically in the security context of
+       the \texttt{camview} user, for example to clean up old images and
+       log files.
+    \EI
+
+    You can reverse all this and uninstall the software easily:
+
+    \texttt{%
+    cd installer\\
+    ./uninstall.sh}
+
+  \subsection{Troubleshooting the system}
+
+    After creating a configuration file and running the installer,
+    check that everything works:
+
+    \BE
+    \I Was the \texttt{camview} user created?\\
+       \texttt{tail -f /etc/passwd}
+    \I Is the \texttt{cam-monitor} process running?\\
+       \texttt{ps -ef | grep cam-monitor | grep -f grep}
+    \I Is there one \texttt{ffmpeg} process running per camera?\\
+       \texttt{ps -ef | grep ffmpeg | grep -f grep}
+    \I Is the \texttt{/mnt/ramdisk} RAMDISK mounted?\\
+       \texttt{df -h /mnt/ramdisk; ls -l /mnt/ramdisk}
+    \I Is there at least one camera folder under\\
+       \texttt{/mnt/ramdisk/security} and are
+       image files being written there?\\
+       \texttt{find /mnt/ramdisk/security -name '*jpg'}
+    \EE
+
+  \subsection{Web view of captured images}
+
+    To check on the status of the system, you should be able
+    to open this URL:
+
+    \URL{http://localhost/cam-bin/cam-status}
+
+    To view "live" images (just those that merit being stored
+    in the backup folder, as they are written there), use this
+    URL:
+
+    \URL{http://localhost/cam-bin/cam-view}
+
+    To download a video file or \texttt{.tar} archive of
+    individual stored images, use this URL:
+
+    \URL{http://localhost/cam-bin/download-recordings}
+
+  \subsection{Remote backups}
+
+    If you want to protect captured images against theft or damage of
+    the capture server, you can configure a command to be run periodically
+    to copy images elsewhere over the network -- for example to a VM in
+    the cloud.
+
+    The installer will check for a folder under the \texttt{config} folder
+    called \texttt{.ssh.\emph{hostname}} where the latter part is the output
+    of \texttt{uname -n}.  If this exists, it will copy files from there
+    to \texttt{/home/camview/.ssh/} once the \texttt{camview} login account
+    is created.
+
+    A good approach to doing this is to create an SSH private and public
+    key-pair for the \texttt{camview} user, create an account on the remote
+    system to which you will copy images and configure the target account to
+    trust the \texttt{camview} user's public key:
+
+    \BI
+    \I Login to the video capture server.
+    \I \texttt{sudo bash} -- \emph{enter your password}.
+    \I \texttt{su - camview}
+    \I \texttt{ssh-keygen} -- \emph{press Enter at the prompts.}
+    \I \texttt{mkdir /tmp/camview-ssh}
+    \I \texttt{cp .ssh/* /tmp/camview-ssh}
+    \I \texttt{exit} -- i.e., log out of the \texttt{camview} account.
+    \I \texttt{exit} -- i.e., this time, log out of the \texttt{root} shell.
+    \I \texttt{mkdir \emph{packagedir}/config/.ssh.`uname -n`}
+    \I \texttt{cp /tmp/camview-ssh/* \emph{packagedir}/config/.ssh.`uname -n`}
+    \EI
+
+    You can run uninstall and install again, to verify that the installer
+    will now create and populate \texttt{/home/camview/.ssh}.
+
+    Next, you have to create an SSH trust relationship.  Copy the file
+    \texttt{/home/camview/.ssh/id\_rsa.pub} to the target account on the
+    remote system and append its contents to that account's \texttt{authorized\_keys}
+    file:
+
+    \BI
+    \I \texttt{scp /tmp/camview-ssh/id\_rsa.pub \emph{backupaccount}@\emph{remotesystem}:/tmp/}
+       -- \emph{enter the password when prompted.}
+    \I \texttt{ssh \emph{backupaccount}@\emph{remotesystem}}
+       -- \emph{enter the password when prompted.}
+    \I \texttt{ssh-keygen}
+       -- \emph{only do this if you have never done so on this account.}
+    \I \texttt{cat /tmp/id\_rsa.pub >> .ssh/authorized\_keys}.
+    \EI
+
+    Test that a trusted SSH login works from the video capture server to the backup
+    server:
+
+    \BI
+    \I \texttt{sudo bash} -- \emph{enter your password}.
+    \I \texttt{su - camview}
+    \I \texttt{ssh \emph{backupaccount}@\emph{remotesystem}}
+    \EI
+
+    You should get a login shell with no password prompt.  If this
+    does not work, check the SSH configuration.  For example, on
+    the remote system, in \texttt{/etc/ssh/sshd\_config}, there
+    should be an entry like \texttt{PubkeyAuthentication yes}.
+
+    Once you have a working mechanism for the local \texttt{camview}
+    user to SSH to a remote account and system, you can add remote backup
+    to the configuration file:
+
+    \texttt{%
+    FILES\_TO\_CACHE=50\\
+    BACKUP\_COMMAND=/bin/tar cf - \%FILES\%\BS{}\\
+      | /usr/bin/ssh \emph{backupaccount}@\emph{remotesystem} "cd security; tar xpf -"
+    }
+
+    In the above, the first parameter tells the system to send images to the
+    remote backup system once every 50 captured frames.  The second parameter
+    specifies the command to run to send images over.
+
+  \subsection{Activating changes to the configuration file}
+
+    If you change the configuration file, for example by adding remote backup
+    as described in the previous section, you need to install the new configuration
+    file into the running system.  There are two ways to do this:
+
+    \BE
+    \I Uninstall and (re)install the software.  This is easiest but also
+       the most disruptive.
+
+       \NOTE{Be sure to deploy the SSH key material in
+             the config folder under \texttt{.ssh.\emph{hostname}}
+             so that it gets installed in the new \texttt{camview}
+             user's home directory.}
+
+    \I Change the configuration in place and stop/restart processes:
+       \BI
+       \I Copy the new configuration file to
+          \texttt{/usr/local/etc/cam-view/config.ini}.
+       \I Stop the cam-monitor process:\\
+          \texttt{sudo bash}\\
+          \texttt{/usr/local/bin/cam-view-stop.sh}
+       \I Either wait for the process to restart automatically (there
+          is a health checking job that runs every 5 minutes) or do it manually:\\
+          \texttt{sudo bash}\\
+          \texttt{su - camview}\\
+          \texttt{/usr/local/bin/cam-view-health-check.sh}
+       \EI
+    \EE
+
+  \subsection{Requiring passwords for web access}
+
+    The default, simple installation does not require user passwords
+    to access any of its URLs.  To add passwords, you can create a
+    password file.  The installer will incorporate it into the
+    Apache configuration
+
+    \BI
+    \I \texttt{cd} \emph{basedir}
+    \I \texttt{cd} \texttt{config}
+    \I\label{htpasswd} \texttt{htpasswd -c htpasswd.`uname -n`} \emph{username}
+    \I Enter the password you would like to use.
+    \EI
+
+    Uninstall and reinstall \PRODUCT{} and check that the
+    URLs now require a password.  The password file gets
+    installed to \texttt{/etc/apache2/cam-view.htpasswd}
+    and you can use the \texttt{htpasswd} command (which is a part
+    of Apache2) to add users.
+
+    The web configuration in
+    \texttt{/etc/apache2/conf-enabled/cam-view.conf} specifies the
+    password file to use.
+
+    To use something more sophisticated, for example
+    \texttt{libapache2-mod-auth-mellon} for SAML authentication
+    via trust of an existing identity provider, you can modify
+    \texttt{/etc/apache2/conf-enabled/cam-view.conf} directly but you
+    are probably better off editing the relevant configuration file in
+    \texttt{installer/web-server} so that your changes take effect on
+    the next installation.
+
+  \subsection{Multi-tenant deployments}
+
+    In some cases, you want to capture video from many cameras but
+    permit different users to view or download content from only a subset
+    of cameras.  This creates a small conflict:
+
+    \BE
+    \I The system should have a single configuration file for the
+       \texttt{cam-monitor} process to use to fetch images from all cameras.
+    \I Each tenant or zone should have a unique URL, with its own,
+       distinct configuration and password files, representing credentials
+       used by people in that tenant and cameras in the tenant space.
+    \EE
+
+    This means we need both a global configuration and per-tenant
+    configurations.  Ideally we can do this without having to write the
+    same configuration data in duplicate locations.
+
+    To address this, we first have to understand how the various
+    \PRODUCT{} binary programs, including \texttt{cam-monitor} and
+    the CGI user interfaces, find their configuration files.  They
+    all use the same logic:
+
+    \BE
+    \I In the current working directory, in a file called \texttt{config.ini}.
+    \I If that fails, in \texttt{/usr/local/etc/camview/config.ini}.
+    \EE
+
+    With this information, we are ready to write multi-tenant configurations:
+
+    \BI
+    \I Create one configuration file with all parameters for all
+       configuration files.  In our example, we'll call this file
+       \texttt{config.params}.  This should set \texttt{BACKUP\_DIR},
+       \texttt{BASE\_DIR}, etc. but not define any cameras.
+    \I Create one configuration file per tenant or zone.  For example, call these
+       \texttt{config.zone1}, \texttt{config.zone2}, etc.  Near the top of
+       each of each zone configuration file, write \texttt{\#include "config.params"}.
+    \I Create a "master" configuration file called \texttt{config.ini} in
+       \texttt{/usr/local/etc/camview} which includes each of the zones.
+    \I Create one CGI folder for each zone or tenant.
+    \I In each CGI folder:
+       \BI
+       \I Copy that zone's configuration file to a local file called
+          \texttt{config.ini}.
+       \I Place a copy of the \texttt{config.params} file.
+       \EI
+       Consider using symbolic or hard links instead of copies to minimize
+       the risk of later duplication.
+    \EI
+
+    Because a multi-tenant configuration is more complex than the simple
+    case described earlier in \FULLREF{simple}, the installer needs a bit
+    of help to configure Apache2.  To do this:
+    
+    \BE
+    \I Create your own configuration file for Apache2.  Create a file
+       called \texttt{apache2-config.\emph{hostname}} in the
+       \texttt{config} directory, where \emph{hostname} is the output
+       of the command \texttt{uname -n}.
+    \I Place the Apache2 configuration in this file.  See an example below.
+    \I Create \texttt{\emph{zone}.htpasswd} files for each tenant or zone
+       that will require password protected logins, also in the \texttt{config}
+       folder.  This was illustrated in \FULLREF{htpasswd}.
+    \EE
+
+    Example multi-tenant Apache configuration file:
+    \begin{verbatim}
+      ScriptAlias /zone1/ /var/www/zone1/
+      <Directory "/var/www/zone1">
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthUserFile /etc/apache2/zone1.htpasswd
+        Require valid-user
+        AllowOverride None
+        Order deny,allow
+        Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+      </Directory>
+
+      ScriptAlias /zone2/ /var/www/zone2/
+      <Directory "/var/www/zone2">
+        AuthType Basic
+        AuthName "Restricted Content"
+        AuthUserFile /etc/apache2/zone2.htpasswd
+        Require valid-user
+        AllowOverride None
+        Order deny,allow
+        Options +ExecCGI -MultiViews +SymLinksIfOwnerMatch
+      </Directory>
+    \end{verbatim}
+
+    Be sure to name the configuration and password files in the
+    \texttt{config} folder as follows:
+
+    \BI
+    \I Main configuration file that includes all zones: \texttt{config.}\emph{hostname}.
+    \I Configuration file for a single zone: \texttt{config.}\emph{zone}.
+    \I Password file for a single zone: \emph{zone}\texttt{.htpasswd}.
+    \EI
+
+    Name zones using \texttt{ScriptAlias}, \texttt{Directory} and
+    \texttt{AuthUserFile} directives in the Apache2 configuration file
+    as shown in the example.
+
+    The installer should be able to handle things from there.
+
+  \subsection{Internet access to local video}
+
+    In a typical deployment, \PRODUCT{} is installed on a local network,
+    which is not reachable from a public Internet address.  If you want
+    to access the \PRODUCT{} web UI at a public URL, and if you have a
+    VM running on a cloud platform such as AWS or Azure, you can readily
+    use port forwarding to accomplish this.
+
+    First, ensure that the cloud-hosted VM with a public, static IP address
+    will accept inbound connections and forward them to ports on an SSH
+    client via a tunnel.  To do this:
+
+    \BI
+    \I Lets call the video capture server \texttt{video} and
+       the cloud VM \texttt{cloud}.
+
+    \I Ensure that the SSH service is running on \texttt{cloud}:\\
+       \texttt{ps -ef|grep sshd}\\
+       If you don't see an SSHD process, install the package:\\
+       \texttt{sudo apt install ssh}
+
+    \I Edit \texttt{/etc/sshd\_config}
+
+    \I Add the following line:\\
+       \texttt{GatewayPorts yes}
+
+    \I Restart the SSHD service:\\
+       \texttt{sudo /etc/init.d/sshd reload}
+    \EI
+
+    Next, create an SSH trust relationship:
+
+    \BE
+    \I Create a login account on \texttt{video}.  Lets call it
+       \texttt{client}.
+
+    \I Create a login account on \texttt{cloud}.  Lets call it
+       \texttt{server}.
+
+    \I Login as \texttt{client} on \texttt{video} and create a key-pair
+       using the \texttt{ssh-keygen} command.
+
+    \I Login as \texttt{server} on \texttt{cloud} and create a key-pair
+       using the \texttt{ssh-keygen} command.
+
+    \I Copy the public key from \texttt{client@video} to
+       \texttt{server@cloud} and append it to the
+       \texttt{.ssh/authorized\_keys} file:
+
+       \BI
+       \I \emph{client@video:~\$} \texttt{scp .ssh/id\_rsa.pub server@cloud:/tmp}
+       \I \emph{server@cloud:~\$} \texttt{cat /tmp/id\_rsa.pub >> .ssh/authorized\_keys}
+       \EI
+
+    \I Verify that it is now possible to login from 
+       \texttt{client@video} to
+       \texttt{server@cloud} without a password:
+
+       \BI
+       \I \emph{client@video:~\$} \texttt{ssh server@cloud}
+       \EI
+    \EE
+
+    Next, write a shell script that runs as \texttt{root} on
+    \texttt{video} which establishes a "reverse" SSH tunnel: Lets call
+    this \texttt{tunnel.sh} and place it in the \texttt{/root} folder
+    on \texttt{video}:
+
+    \begin{verbatim}
+#!/bin/sh
+
+while :
+do
+  echo "Opening ssh tunnel"
+  echo '' | ssh -M -R '*:8881:localhost:80' -i /home/client/.ssh/id_rsa server@video "sleep 99999"
+  sleep 1
+done
+    \end{verbatim}
+
+    Finally, write a shell script that is periodically run as root
+    by the cron scheduler, which checks to see if a tunnel is running
+    and starts it if not:
+
+    \begin{verbatim}
+#!/bin/sh
+
+PROCESS=`ps -ef|grep '8881:localhost:80'|grep -v grep`
+
+if [ -z "$PROCESS" ]; then
+  /root/tunnel.sh &
+fi
+    \end{verbatim}
+
+    Put this in \texttt{/root/tunnel-check.sh}.
+
+    Finally, schedule this job to run every few minutes, to ensure
+    that even if the tunnel process failed for some reason, it gets
+    restarted:
+
+    \BI
+    \I Edit the cron table:\\
+       \texttt{crontab -e}
+    \I Add this line of text:\\
+       \texttt{*/10 * * * * /root/tunnel-check.sh}
+    \EI
+
+    You should now be able to access the video system at this URL:
+
+    \URL{http://cloud:8881/cam-bin/cam-view}
+
+    In the above, as noted earlier, \texttt{cloud} is the hostname or
+    IP address of the cloud VM that terminates the reverse SSH tunnel.
+
