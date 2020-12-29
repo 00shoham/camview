@@ -7,6 +7,8 @@ BINDIR/cam-archive -c ETCDIR/config.ini -range 2 20 -tar -remove
 if [ -d "$BACKUP_DIR" ]; then
   find "$BACKUP_DIR" -type f -mtime +21\
     | xargs rm
+  find "$BACKUP_DIR" -type f -size 0\
+    | xargs rm
 fi
 
 BASE_DIR=`BINDIR/cam-config -c ETCDIR/config.ini -printvar BASE_DIR`
