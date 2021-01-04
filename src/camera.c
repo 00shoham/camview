@@ -1,5 +1,4 @@
 #include "base.h"
-#include "nargv.h"
 
 _CONFIG* glob_conf=NULL;
 void StopCaptureProcesses()
@@ -58,36 +57,6 @@ void PingCameras( int signo )
 
   int n = LaunchAllCameras( glob_conf );
   Notice("Checked all capture processes.  Launched %d new processes.", n );
-  }
-
-/* be sure we are in the correct directory first! */
-void SwapInProcess( int debugStderr, int debugStdout, char* nick, char* commandLine )
-  {
-  if( EMPTY( commandLine ) )
-    {
-    Error( "Cannot run empty command line for camera %s", NULLPROTECT(nick) );
-    }
-
-  NARGV* args = nargv_parse( commandLine );
-  if( args==NULL )
-    {
-    Error( "Failed to parse cmd line [%s] for camera %s",
-           commandLine, NULLPROTECT(nick) );
-    }
-
-  /* printf("Trying to exec [%s] with %d args\n", args->argv[0], args->argc ); */
-  fclose( stdin );
-  if( freopen( debugStderr ? "stderr.log" : "/dev/null", "w", stderr )==NULL )
-    {
-    Warning("Failed to redirect stderr");
-    }
-  if( freopen( debugStdout ? "stdout.log" : "/dev/null", "w", stdout )==NULL )
-    {
-    Warning("Failed to redirect stdout");
-    }
-  (void)execv( args->argv[0], args->argv );
-  Error( "execv on [%s] returned error %d - %s",
-         commandLine, errno, strerror( errno ) );
   }
 
 void CameraBackupFolder( _CONFIG* config, _CAMERA* cam )

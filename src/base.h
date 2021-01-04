@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <time.h>
@@ -102,6 +103,7 @@ void Notice( char* fmt, ... );
 #define MAX_BACK 20
 #define MAX_FORWARD 20
 
+#include "nargv.h"
 #include "util.h"
 #include "image.h"
 #include "config.h"

@@ -23,30 +23,30 @@ int PingAddress( char* netAddress )
       }
     else if( StringMatchesRegex( "bytes from.*icmp_seq.*ttl.*time", buf )==0 )
       {
-      fclose( h );
+      (void)pclose( h );
       return 0;
       }
     else if( StringMatchesRegex( "Unreachable", buf )==0 )
       {
-      fclose( h );
+      (void)pclose( h );
       Warning("Host %s not reachable (a)", netAddress );
       return -2;
       }
     else if( StringMatchesRegex( "100% packet loss", buf )==0 )
       {
-      fclose( h );
+      (void)pclose( h );
       Warning("Host %s not reachable (b)", netAddress );
       return -3;
       }
     else if( StringMatchesRegex( " 0 received", buf )==0 )
       {
-      fclose( h );
+      (void)pclose( h );
       Warning("Host %s not reachable (c)", netAddress );
       return -4;
       }
     }
 
-  fclose( h );
+  (void)pclose( h );
   Warning("Host %s not reachable (d)", netAddress );
 
   return -5;

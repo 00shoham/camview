@@ -118,4 +118,8 @@ int ListToJSON( _TAG_VALUE* list, char* buf, int bufLen );
 int NestedListToJSON( char* arrayName, _TAG_VALUE* list, char* buf, int bufLen );
 long long TimeInMicroSeconds();
 
+void SwapInProcess( int debugStderr, int debugStdout, char* nick, char* commandLine );
+int RunCommand( int debugStderr, int debugStdout, char* commandLine );
+void RunCommandWithManyFilesOnStdin( char* commandLine, char* pathWithFilenames );
+
 #endif

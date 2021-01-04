@@ -1146,7 +1146,7 @@ int GetAvailableSpaceOnVolume( char* path, char* buf, int bufLen )
     }
 
   size_t n = fread( buf, sizeof(char), bufLen, dfH );
-  fclose( dfH );
+  (void)pclose( dfH );
   if( n>0 && n<bufLen-1 )
     {
     buf[n] = 0;
@@ -1736,7 +1736,7 @@ char* GUID()
     {
     Error( "Cannot read from /usr/bin/uuidgen (%d:%s)", errno, strerror( errno ) );
     }
-  fclose( h );
+  (void)pclose( h );
   return strdup( StripEOL( buf ) );
   }
 
@@ -1892,5 +1892,163 @@ long long TimeInMicroSeconds()
   gettimeofday(&te, NULL); // get current time
   long long us = te.tv_sec*1000000LL + te.tv_usec;
   return us;
+  }
+
+/* be sure we are in the correct directory first! */
+void SwapInProcess( int debugStderr, int debugStdout, char* nick, char* commandLine )
+  {
+  if( EMPTY( commandLine ) )
+    {
+    Error( "Cannot run empty command line for camera %s", NULLPROTECT(nick) );
+    }
+
+  NARGV* args = nargv_parse( commandLine );
+  if( args==NULL )
+    {
+    Error( "Failed to parse cmd line [%s] for [%s]",
+           commandLine, NULLPROTECT(nick) );
+    }
+
+  /* printf("Trying to exec [%s] with %d args\n", args->argv[0], args->argc ); */
+  fclose( stdin );
+  if( freopen( debugStderr ? "stderr.log" : "/dev/null", "w", stderr )==NULL )
+    {
+    Warning("Failed to redirect stderr");
+    }
+  if( freopen( debugStdout ? "stdout.log" : "/dev/null", "w", stdout )==NULL )
+    {
+    Warning("Failed to redirect stdout");
+    }
+  (void)execv( args->argv[0], args->argv );
+  Error( "execv on [%s] returned error %d - %s",
+         commandLine, errno, strerror( errno ) );
+  }
+
+int RunCommand( int debugStderr, int debugStdout, char* commandLine )
+  {
+  pid_t child = fork();
+
+  if( child<0 )
+    {
+    Warning("Failed to fork a child process" );
+    return -1;
+    }
+
+  if( child==0 ) /* in child */
+    {
+    SwapInProcess( debugStderr, debugStdout, NULL, commandLine );
+
+    /* should never reach this */
+    }
+
+  int status;
+  for(;;)
+    {
+    if( waitpid( child, &status, 0)==-1 )
+      {
+      Warning( "waitpid errored out" );
+      return -1;
+      }
+    if( WIFEXITED( status ) )
+      {
+      return WEXITSTATUS(status);
+      }
+    }
+  }
+
+#define READ_END 0
+#define WRITE_END 1
+
+/* either works or exits process with error msg
+   - does not return with an error code */
+void RunCommandWithManyFilesOnStdin( char* commandLine, char* pathWithFilenames )
+  {
+  if( EMPTY( commandLine ) )
+    {
+    Error( "Cannot run empty command line with multi-file stdin" );
+    }
+
+  if( EMPTY( pathWithFilenames ) )
+    {
+    Error( "Cannot run command without specifying file specifying inputs" );
+    }
+
+  if( FileExists( pathWithFilenames )!=0 )
+    {
+    Error( "File %s does not exist - cannot run command", pathWithFilenames );
+    }
+
+  int fd[2];
+  if( pipe(fd)!=0 )
+    {
+    Error( "Failed to create a pipe - %d:%s", errno, strerror( errno ) );
+    }
+
+  pid_t childProcess = fork();
+  if( childProcess<0 )
+    {
+    Error( "Failed to fork - %d:%s", errno, strerror( errno ) );
+    }
+
+  if( childProcess==0 )
+    { /* child */
+    dup2( fd[READ_END], STDIN_FILENO );
+    close( fd[READ_END] ); /* this handle is redundant - use STDIN */
+    close( fd[WRITE_END] ); /* only the parent needs this side */
+
+    NARGV* args = nargv_parse( commandLine );
+    if( args==NULL )
+      {
+      Error( "Failed to parse cmd line [%s]", commandLine );
+      }
+
+    (void)execv( args->argv[0], args->argv );
+    Error( "execv on [%s] returned error %d - %s",
+           commandLine, errno, strerror( errno ) );
+    }
+  else
+    { /* parent */
+    close( fd[READ_END] ); /* only the child needs this side */
+
+    /* read a list of filenames from the master file: */
+    FILE* listFile = fopen( pathWithFilenames, "r" );
+    if( listFile==NULL )
+      {
+      Error( "Cannot open %s for reading", pathWithFilenames );
+      }
+
+    char buf[BUFLEN];
+    while( fgets( buf, sizeof(buf)-1, listFile )==buf )
+      {
+      /* for each file, read its data into memory: */
+      char* dataFileName = StripEOL( buf );
+      unsigned char* dataInFile = NULL;
+      long nBytes = FileRead( dataFileName, &dataInFile );
+
+      /* write the data we just read into the pipe */
+      unsigned char* ptr = dataInFile;
+      while( nBytes>0 )
+        {
+        long n = write( fd[WRITE_END], ptr, nBytes );
+        nBytes -= n;
+        ptr += n;
+        }
+      free( dataInFile );
+      nBytes = 0;
+      }
+    fclose( listFile );
+
+    /* all done feeding data to the child - now wait for it to exit*/
+    close( fd[WRITE_END] );
+    for(;;)
+      {
+      int childExitStatus = 0;
+      waitpid( childProcess, &childExitStatus, 0);
+      if( WIFEXITED(childExitStatus) )
+        {
+        break;
+        }
+      }
+    }
   }
 
