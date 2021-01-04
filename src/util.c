@@ -101,10 +101,12 @@ time_t FileDate2( const char* folder, const char* fileName )
 
 long FileSize( const char* path )
   {
+  /* redundant - stat will fail.
   if( FileExists( path )!=0 )
     {
     return -1;
     }
+  */
 
   struct stat sbuf;
   if( stat( path, &sbuf )<0 )

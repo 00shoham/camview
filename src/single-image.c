@@ -15,13 +15,16 @@ void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
     Error("Cannot send empty file for camera %s", nickName );
     }
 
+  /* redundant - we're checking file size next.
+
   if( FileExists( fileName )!=0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error("File %s does not exist in camera %s", fileName, nickName );
-    }
+    } 
+  */
 
-  long n = FileSize( fileName );;
+  long n = FileSize( fileName );
   if( n<=0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
@@ -95,43 +98,20 @@ void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
 
 char* MostRecentFilename( char* nickName )
   {
-  DIR* d = opendir( "." );
-  if( d==NULL )
-    {
-    CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
-    Error( "Cannot open folder for camera %s.", nickName );
-    }
+  char** folder = NULL;
+  int nFiles = GetOrderedDirectoryEntries(
+                 ".", NULL, ".jpg", &folder, 1 );
 
-  struct dirent * de;
-  struct stat sbuf;
-  time_t when = 0;
-  char filename[BUFLEN] = { 0 };
-  while( (de=readdir( d ))!=NULL )
-    {
-    if( NOTEMPTY( de->d_name ) )
-      {
-      if( StringEndsWith( de->d_name, ".jpg", 0 )==0
-          && stat( de->d_name, &sbuf )==0 )
-        {
-        if( (sbuf.st_mode & S_IFMT)==S_IFREG
-            && sbuf.st_mtime > when )
-          {
-          when = sbuf.st_mtime;
-          strncpy( filename, de->d_name, sizeof(filename)-1 );
-          }
-        }
-      }
-    }
-
-  closedir( d );
-
-  if( when==0 )
+  if( nFiles==0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "No images found for camera %s.", nickName );
     }
 
-  return strdup( filename );
+  char* lastImage = strdup( folder[nFiles-1] );
+  FreeArrayOfStrings( folder, nFiles );
+
+  return lastImage;
   }
 
 void SendMostRecentImage( char* nickName, int maxWidth )
