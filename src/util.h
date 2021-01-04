@@ -36,6 +36,13 @@ typedef struct ipaddr
 #define FREEIFNOTNULL(X) {if( (X)!=NULL ) { free(X); X=NULL; }}
 #define SAFESTRDUP(X) ((X)==NULL?NULL:strdup(X))
 
+/* To use the following two macros, you must also define these vars:
+   char* segment;
+   long long t1, t2, d;
+*/
+#define START_TIMER(S) { segment=S; t1 = TimeInMicroSeconds(); }
+#define STOP_TIMER() { t2 = TimeInMicroSeconds(); d=t2-t1; Notice("%s ran in %lld microseconds\n", segment, d);}
+
 struct _config;
 typedef struct _config _CONFIG;
 
