@@ -18,6 +18,3 @@ done
 for lb in $CLIBIN; do
   sudo install -o root -g root -m 755 "$lb" /usr/local/bin
 done
-
-sudo /bin/su -c /usr/local/bin/cam-view-stop.sh - camview
-sudo /bin/su -c /usr/local/bin/cam-view-health-check.sh - camview
