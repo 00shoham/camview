@@ -54,7 +54,8 @@ typedef struct _camera
   double checkerboard_percent;
 
   /* prevent thread problems */
-  pthread_mutex_t lock;
+  pthread_mutex_t lock;  /* lock file storage stuff */
+  pthread_mutex_t tlock; /* lock thread admin stuff */
   } _CAMERA;
 
 typedef struct _config

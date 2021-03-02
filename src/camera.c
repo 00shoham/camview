@@ -140,6 +140,9 @@ void CleanCameraFolder( _CAMERA* cam )
     return;
     }
 
+  /* don't delete files while we're backing them up */
+  pthread_mutex_lock( &(cam->lock) );
+
   /* remove the jpg files */
   char** folder = NULL;
   int nFiles = GetOrderedDirectoryEntries(
@@ -155,6 +158,8 @@ void CleanCameraFolder( _CAMERA* cam )
     {
     FreeArrayOfStrings( folder, nFiles );
     }
+
+  pthread_mutex_unlock( &(cam->lock) );
 
   /* rename the log files */
   char *nowName = TimeStampFilename( 0 );
@@ -611,6 +616,8 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
           cam->nickName, NULLPROTECT( fileName ),
           NULLPROTECT( prevFile ) );
   */
+  pthread_mutex_lock( &(cam->tlock) );
+
   if( cam->haveMotionDetectThread )
     {
     pthread_join( cam->motionDetectThread, NULL );
@@ -634,6 +641,9 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
                             ProcessNewImageInThread,
                             (void*)tparams
                           );
+
+  pthread_mutex_unlock( &(cam->tlock) );
+
   /*
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
@@ -739,13 +749,19 @@ void ScanFolderForNewFiles( _CONFIG* config, _CAMERA* cam )
         {
         Notice( "Removing %d old images under %s", nFiles - FILES_TO_KEEP, cam->nickName );
         }
+
+      /* don't delete files while we're backing them up */
+      pthread_mutex_lock( &(cam->lock) );
+
       for( int j=0; j < (nFiles-FILES_TO_KEEP); ++j )
         {
         (void)FileUnlink2( cam->folderPath, folder[j] );
         }
+
+      pthread_mutex_unlock( &(cam->lock) );
       }
 
-    if( (nFiles-2)>0 ) /* this image was not the first */
+    if( nFiles>2 ) /* this image was not the first */
       {
       /* printf("Processing %s; prev image is %s\n", fileName, folder[nFiles-3]); */
       ProcessNewImage( config, cam, fileName, folder[nFiles-3] );
