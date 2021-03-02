@@ -3,17 +3,18 @@
 #SCHEDULE: 0 0 * * *
 
 BACKUP_DIR=`BINDIR/cam-config -c ETCDIR/config.ini -printvar BACKUP_DIR`
-BINDIR/cam-archive -c ETCDIR/config.ini -range 2 20 -tar -remove
-if [ -d "$BACKUP_DIR" ]; then
-  find "$BACKUP_DIR" -type f -mtime +14\
+if [ -d "$BACKUP_DIR/" ]; then
+  find "$BACKUP_DIR/" -type f -mtime +14\
     | xargs rm
-  find "$BACKUP_DIR" -type f -size 0\
+  find "$BACKUP_DIR/" -type f -size 0\
     | xargs rm
 fi
 
+BINDIR/cam-archive -c ETCDIR/config.ini -range 2 20 -tar -remove
+
 BASE_DIR=`BINDIR/cam-config -c ETCDIR/config.ini -printvar BASE_DIR`
-if [ -d "$BASE_DIR" ]; then
-  find "$BASE_DIR" -name '*log' -ctime +10\
+if [ -d "$BASE_DIR/" ]; then
+  find "$BASE_DIR/" -name '*log' -ctime +10\
     | grep -v monitor.log\
     | xargs rm
 fi
