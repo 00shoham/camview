@@ -5,15 +5,8 @@ extern char** glob_argv;
 extern _CONFIG* glob_conf;
 extern int inCGI;
 
-#undef LOG_TIMING
-
 void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
   {
-#ifdef LOG_TIMING
-  char* segment;
-  long long t1, t2, d;
-  START_TIMER("single-image: SendSpecificImage")
-#endif
   int err = 0;
 
   if( EMPTY( fileName ) )
@@ -22,16 +15,13 @@ void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
     Error("Cannot send empty file for camera %s", nickName );
     }
 
-  /* redundant - we're checking file size next.
-
   if( FileExists( fileName )!=0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error("File %s does not exist in camera %s", fileName, nickName );
-    } 
-  */
+    }
 
-  long n = FileSize( fileName );
+  long n = FileSize( fileName );;
   if( n<=0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
@@ -44,10 +34,12 @@ void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
     }
   else
     {
-    unsigned char* imageFile;
+    unsigned char* imageFile = NULL;
     long nBytes = FileRead( fileName, &imageFile );
     if( nBytes!=n )
       {
+      if( imageFile!=NULL )
+        free( imageFile );
       CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
       Error( "Inconsistent file size (%ld / %ld)", n, nBytes );
       }
@@ -101,35 +93,47 @@ void SendSpecificImage( char* nickName, char* fileName, int maxWidth )
   /* do we need this? */
   fputs( "\r\n", stdout );
   fclose( stdout );
-#ifdef LOG_TIMING
-  STOP_TIMER()
-#endif
   }
 
 char* MostRecentFilename( char* nickName )
   {
-#ifdef LOG_TIMING
-  char* segment;
-  long long t1, t2, d;
-  START_TIMER("single-image: MostRecentFilename")
-#endif
-  char** folder = NULL;
-  int nFiles = GetOrderedDirectoryEntries(
-                 ".", NULL, ".jpg", &folder, 1 );
+  DIR* d = opendir( "." );
+  if( d==NULL )
+    {
+    CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
+    Error( "Cannot open folder for camera %s.", nickName );
+    }
 
-  if( nFiles==0 )
+  struct dirent * de;
+  struct stat sbuf;
+  time_t when = 0;
+  char filename[BUFLEN] = { 0 };
+  while( (de=readdir( d ))!=NULL )
+    {
+    if( NOTEMPTY( de->d_name ) )
+      {
+      if( StringEndsWith( de->d_name, ".jpg", 0 )==0
+          && stat( de->d_name, &sbuf )==0 )
+        {
+        if( (sbuf.st_mode & S_IFMT)==S_IFREG
+            && sbuf.st_mtime > when )
+          {
+          when = sbuf.st_mtime;
+          strncpy( filename, de->d_name, sizeof(filename)-1 );
+          }
+        }
+      }
+    }
+
+  closedir( d );
+
+  if( when==0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "No images found for camera %s.", nickName );
     }
 
-  char* lastImage = strdup( folder[nFiles-1] );
-  FreeArrayOfStrings( folder, nFiles );
-
-#ifdef LOG_TIMING
-  STOP_TIMER()
-#endif
-  return lastImage;
+  return strdup( filename );
   }
 
 void SendMostRecentImage( char* nickName, int maxWidth )
@@ -153,11 +157,6 @@ void NameMostRecentImage( char* nickName )
 /* assumes current working dir belongs to the camera */
 void GetInfoForSelectedCamera( char* cameraID )
   {
-#ifdef LOG_TIMING
-  char* segment;
-  long long t1, t2, d;
-  START_TIMER("single-image: GetInfoForSelectedCamera")
-#endif
   /* { "s" : "Hello", "i" : 1234 } */
   _TAG_VALUE* list = NULL;
 
@@ -184,18 +183,11 @@ void GetInfoForSelectedCamera( char* cameraID )
     fputs( buf, stdout );
     }
   FreeTagValue( list );
-#ifdef LOG_TIMING
-  STOP_TIMER()
-#endif
   }
 
 void GoBackForward( char* cameraID, char* fileName, int goBack, int goForward )
   {
-#ifdef LOG_TIMING
-  char* segment;
-  long long t1, t2, d;
-  START_TIMER("single-image: GoBackForward")
-#endif
+  /* QQQ */
   int allocatedFilename = 0;
   if( EMPTY( fileName ) )
     {
@@ -206,12 +198,34 @@ void GoBackForward( char* cameraID, char* fileName, int goBack, int goForward )
       }
     }
 
-  char** files = NULL;
-  int nFiles = GetOrderedDirectoryEntries(
-                 ".", NULL, ".jpg", &files, 1 );
+  int n = CountFilesInFolder( NULL, NULL, ".jpg", NULL, NULL );
+  char** files = SafeCalloc( n+20, sizeof(char*), "filename array" );
+
+  DIR* d = opendir( "." );
+  if( d==NULL )
+    {
+    CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
+    Error( "Cannot open folder for camera %s.", cameraID );
+    }
+
+  int fileNum = 0;
+  struct dirent * de;
+  while( (de=readdir( d ))!=NULL )
+    {
+    if( NOTEMPTY( de->d_name )
+        && StringEndsWith( de->d_name, ".jpg", 0 )==0
+        && fileNum < n+20 )
+      {
+      files[fileNum] = strdup( de->d_name );
+      ++fileNum;
+      }
+    }
+  closedir( d );
+
+  qsort( files, fileNum, sizeof( char* ), CompareStrings );
 
   int anchor = -1;
-  for( int i=0; i<nFiles; ++i )
+  for( int i=0; i<fileNum; ++i )
     {
     char* s = files[i];
     if( NOTEMPTY( s ) && strcmp( s, fileName )==0 )
@@ -234,7 +248,7 @@ void GoBackForward( char* cameraID, char* fileName, int goBack, int goForward )
     int start = anchor - goBack;
     if( start<0 ) start = 0;
     int finish = anchor + goForward;
-    if( finish>=nFiles ) finish = nFiles-1;
+    if( finish>=fileNum ) finish = fileNum-1;
     for( int i=finish; i>=start; --i )
       {
       _TAG_VALUE* list = NewTagValue( "filename", files[i], NULL, 0 );
@@ -252,18 +266,19 @@ void GoBackForward( char* cameraID, char* fileName, int goBack, int goForward )
   else
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
-    Error( "Cannot convert %d files to a JSON.", nFiles );
+    Error( "Cannot convert %d files to a JSON.", fileNum );
     }
 
-  FreeArrayOfStrings( files, nFiles );
+  for( int i=0; i<fileNum; ++i )
+    {
+    FreeIfAllocated( files+i );
+    }
+  free( files );
 
   if( allocatedFilename )
     {
     free( fileName );
     }
-#ifdef LOG_TIMING
-  STOP_TIMER()
-#endif
   }
 
 void CGIBody()
@@ -425,12 +440,6 @@ void CGIBody()
 
 int main( int argc, char** argv )
   {
-#ifdef LOG_TIMING
-  char* segment;
-  long long t1, t2, d;
-  START_TIMER("single-image: Initialization")
-#endif
-
   glob_argc = argc;
   glob_argv = argv;
 
@@ -468,9 +477,6 @@ int main( int argc, char** argv )
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "Failed to open %s", config->cgiLogFile );
     }
-#ifdef LOG_TIMING
-  STOP_TIMER()
-#endif
 
   CGIBody();
 

@@ -1,4 +1,5 @@
 #include "base.h"
+#include "nargv.h"
 
 _CONFIG* glob_conf=NULL;
 void StopCaptureProcesses()
@@ -57,6 +58,36 @@ void PingCameras( int signo )
 
   int n = LaunchAllCameras( glob_conf );
   Notice("Checked all capture processes.  Launched %d new processes.", n );
+  }
+
+/* be sure we are in the correct directory first! */
+void SwapInProcess( int debugStderr, int debugStdout, char* nick, char* commandLine )
+  {
+  if( EMPTY( commandLine ) )
+    {
+    Error( "Cannot run empty command line for camera %s", NULLPROTECT(nick) );
+    }
+
+  NARGV* args = nargv_parse( commandLine );
+  if( args==NULL )
+    {
+    Error( "Failed to parse cmd line [%s] for camera %s",
+           commandLine, NULLPROTECT(nick) );
+    }
+
+  /* printf("Trying to exec [%s] with %d args\n", args->argv[0], args->argc ); */
+  fclose( stdin );
+  if( freopen( debugStderr ? "stderr.log" : "/dev/null", "w", stderr )==NULL )
+    {
+    Warning("Failed to redirect stderr");
+    }
+  if( freopen( debugStdout ? "stdout.log" : "/dev/null", "w", stdout )==NULL )
+    {
+    Warning("Failed to redirect stdout");
+    }
+  (void)execv( args->argv[0], args->argv );
+  Error( "execv on [%s] returned error %d - %s",
+         commandLine, errno, strerror( errno ) );
   }
 
 void CameraBackupFolder( _CONFIG* config, _CAMERA* cam )
@@ -140,9 +171,6 @@ void CleanCameraFolder( _CAMERA* cam )
     return;
     }
 
-  /* don't delete files while we're backing them up */
-  pthread_mutex_lock( &(cam->lock) );
-
   /* remove the jpg files */
   char** folder = NULL;
   int nFiles = GetOrderedDirectoryEntries(
@@ -158,8 +186,6 @@ void CleanCameraFolder( _CAMERA* cam )
     {
     FreeArrayOfStrings( folder, nFiles );
     }
-
-  pthread_mutex_unlock( &(cam->lock) );
 
   /* rename the log files */
   char *nowName = TimeStampFilename( 0 );
@@ -177,6 +203,8 @@ void CleanCameraFolder( _CAMERA* cam )
       snprintf( newname, sizeof(newname)-1, "%s.stdout.log", nowName );
       (void)FileRename2( cam->folderPath, "stdout.log", newname );
       }
+    free( nowName );
+    nowName = NULL;
     }
   }
 
@@ -486,12 +514,12 @@ void* ProcessNewImageInThread( void* params )
   char* prevFile = tparams->prevFile;
 
   /* printf("ProcessNewImage(%s)\n", cam->nickName); */
-  if( config==NULL )
+  if( config==NULL || cam==NULL || EMPTY( fileName ) )
+    {
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
-  if( cam==NULL )
-    return NULL;
-  if( EMPTY( fileName ) )
-    return NULL;
+    }
 
   /* don't process the same file twice */
   if( NOTEMPTY( cam->lastImageSourceName )
@@ -505,6 +533,8 @@ void* ProcessNewImageInThread( void* params )
       KillCameraProcess( cam );
       }
 
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
@@ -518,6 +548,8 @@ void* ProcessNewImageInThread( void* params )
     {
     Warning( "Image %s for camera %s too small (%d versus previous %d)",
              fileName, cam->nickName, size, cam->largestFile );
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
@@ -526,6 +558,8 @@ void* ProcessNewImageInThread( void* params )
     {
     Notice( "Captured first image for %s - %s", cam->nickName, fileName );
     StoreImage( config, cam, fileName, size, 0 );
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
@@ -535,6 +569,8 @@ void* ProcessNewImageInThread( void* params )
     -- cam->motionCountdown;
     /* Notice("Storing image due to countdown (%s/%s - %d)", cam->nickName, fileName, cam->motionCountdown ); */
     StoreImage( config, cam, fileName, size, 0 );
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
@@ -544,15 +580,19 @@ void* ProcessNewImageInThread( void* params )
     {
     /* Notice("Storing image due to timeout (%s/%s - %d)", cam->nickName, fileName, age ); */
     StoreImage( config, cam, fileName, size, 0 );
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
   /* read image, check if it's too dark? */
   /* Notice( "Reading JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, fileName ); */
   _IMAGE* image = ImageFromJPEGFile2( cam->nickName, cam->folderPath, fileName );
-  if( image==NULL || image->data==NULL )
+  if( image!=NULL )
     {
     FreeImage( &image );
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
   int luminosity = AverageImageLuminosity( image );
@@ -562,6 +602,8 @@ void* ProcessNewImageInThread( void* params )
        compare against it later */
     FreePrevImage( NULL, cam );
     cam->recentImage = image;
+    FREEIFNOTNULL( fileName );
+    FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
@@ -598,6 +640,8 @@ void* ProcessNewImageInThread( void* params )
   /* Notice( "Keeping image (%s/%s)", cam->nickName, image->fileName ); */
   cam->recentImage = image;
 
+  FREEIFNOTNULL( fileName );
+  FREEIFNOTNULL( prevFile );
   return NULL;
   }
 
@@ -616,8 +660,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
           cam->nickName, NULLPROTECT( fileName ),
           NULLPROTECT( prevFile ) );
   */
-  pthread_mutex_lock( &(cam->tlock) );
-
   if( cam->haveMotionDetectThread )
     {
     pthread_join( cam->motionDetectThread, NULL );
@@ -641,9 +683,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
                             ProcessNewImageInThread,
                             (void*)tparams
                           );
-
-  pthread_mutex_unlock( &(cam->tlock) );
-
   /*
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
@@ -749,19 +788,13 @@ void ScanFolderForNewFiles( _CONFIG* config, _CAMERA* cam )
         {
         Notice( "Removing %d old images under %s", nFiles - FILES_TO_KEEP, cam->nickName );
         }
-
-      /* don't delete files while we're backing them up */
-      pthread_mutex_lock( &(cam->lock) );
-
       for( int j=0; j < (nFiles-FILES_TO_KEEP); ++j )
         {
         (void)FileUnlink2( cam->folderPath, folder[j] );
         }
-
-      pthread_mutex_unlock( &(cam->lock) );
       }
 
-    if( nFiles>2 ) /* this image was not the first */
+    if( (nFiles-2)>0 ) /* this image was not the first */
       {
       /* printf("Processing %s; prev image is %s\n", fileName, folder[nFiles-3]); */
       ProcessNewImage( config, cam, fileName, folder[nFiles-3] );

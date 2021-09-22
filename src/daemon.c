@@ -72,7 +72,7 @@ pid_t LaunchDaemon( int closeSTDIO )
   (void)signal( SIGINT, TerminateMonitor );
   (void)signal( SIGQUIT, TerminateMonitor );
   (void)signal( SIGKILL, TerminateMonitor );
-  (void)signal( SIGSEGV, TerminateMonitor );
+  (void)signal( SIGSEGV, SegFaultHandler );
   (void)signal( SIGTERM, TerminateMonitor );
 
   /* Open the log file */

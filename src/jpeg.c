@@ -83,11 +83,21 @@ int DecompressJPEGFromBytes(
 
 _IMAGE* ImageFromJPEGFile( char* nickName, char* fileName )
   {
-  if( EMPTY( nickName ) ) Error( "ImageFromJPEGFile - must specify camera ID" );
-  if( EMPTY( fileName ) ) Error( "ImageFromJPEGFile - must specify fileName" );
+  if( EMPTY( nickName ) )
+    Error( "ImageFromJPEGFile - must specify camera ID" );
+
+  if( EMPTY( fileName ) )
+    Error( "ImageFromJPEGFile - must specify fileName" );
+
   unsigned char* fileData = NULL;
   long fileBytes = FileRead( fileName, &fileData );
-  if( fileBytes<=0 ) { Warning( "ImageFromJPEGFile: %s empty", fileName ); return NULL; }
+  if( fileBytes<=0 )
+    {
+    if( fileData!=NULL )
+      free( fileData );
+    Warning( "ImageFromJPEGFile: %s empty", fileName );
+    return NULL;
+    }
   _IMAGE* image = NewImage( nickName, GetFilenameFromPath( fileName ), 0, 0, 0 );
   int err = DecompressJPEGFromBytes( fileData, fileBytes, image );
   FREE( fileData );

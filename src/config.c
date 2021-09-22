@@ -48,10 +48,6 @@ void SetDefaultsSingleCamera( _CONFIG* config, _CAMERA* cam )
     {
     Error( "Failed to init a mutex for camera %s", NULLPROTECT( cam->nickName ) );
     }
-  if( pthread_mutex_init( &(cam->tlock), NULL )!=0 )
-    {
-    Error( "Failed to init second mutex for camera %s", NULLPROTECT( cam->nickName ) );
-    }
   }
 
 void FreeCamera( _CAMERA* cam )
@@ -69,7 +65,6 @@ void FreeCamera( _CAMERA* cam )
   FreeIfAllocated( &(cam->lastImageSourceName) );
 
   (void)pthread_mutex_destroy( &(cam->lock) );
-  (void)pthread_mutex_destroy( &(cam->tlock) );
 
   FREE( cam );
   }

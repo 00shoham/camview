@@ -23,6 +23,7 @@ BIN=\
   imagediff\
   brightenimage\
   testimagelist\
+  crashtest\
   $(WEBBIN)
 
 USER=nobody
@@ -35,7 +36,8 @@ WEBLOG=/mnt/ramdisk/security/cgi.log
 all: $(BIN)
 
 CC=gcc
-CFLAGS=-Wall -O2 -g
+# CFLAGS=-Wall -O2 -g -rdynamic -fsanitize=address
+CFLAGS=-Wall -O2
 LIBS=-ljpeg -lpthread -lm
 SHAREDOBJ=\
   cgi.o\

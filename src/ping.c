@@ -23,30 +23,30 @@ int PingAddress( char* netAddress )
       }
     else if( StringMatchesRegex( "bytes from.*icmp_seq.*ttl.*time", buf )==0 )
       {
-      (void)pclose( h );
+      fclose( h );
       return 0;
       }
     else if( StringMatchesRegex( "Unreachable", buf )==0 )
       {
-      (void)pclose( h );
+      fclose( h );
       Warning("Host %s not reachable (a)", netAddress );
       return -2;
       }
     else if( StringMatchesRegex( "100% packet loss", buf )==0 )
       {
-      (void)pclose( h );
+      fclose( h );
       Warning("Host %s not reachable (b)", netAddress );
       return -3;
       }
     else if( StringMatchesRegex( " 0 received", buf )==0 )
       {
-      (void)pclose( h );
+      fclose( h );
       Warning("Host %s not reachable (c)", netAddress );
       return -4;
       }
     }
 
-  (void)pclose( h );
+  fclose( h );
   Warning("Host %s not reachable (d)", netAddress );
 
   return -5;
@@ -79,6 +79,7 @@ int IPAddressFromCommand( char* buf, int bufLen, char* command )
     {
     strncpy( buf, ptr, bufLen-1 );
     FREE( tmpBuf );
+    FREE( ptr );
     return 0;
     }
 

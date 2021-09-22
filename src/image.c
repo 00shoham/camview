@@ -99,7 +99,6 @@ void FreeImage( _IMAGE** p2 )
   *p2 = NULL;
   }
 
-
 char* TimeStampFilename( int deltaSeconds )
   {
   char name[BUFLEN];
@@ -160,10 +159,12 @@ int IsImageBlack( char* nickName, char* fileName )
     return -3;
     }
 
-  unsigned char* fileData;
+  unsigned char* fileData = NULL;
   long fileBytes = FileRead( fileName, &fileData );
   if( fileBytes<=0 )
     {
+    if( fileData!=NULL )
+      free( fileData );
     Warning( "Cannot get luminosity of empty file (%s/%s)",
              nickName, fileName );
     return -4;
@@ -174,6 +175,7 @@ int IsImageBlack( char* nickName, char* fileName )
   if( err!=0 || image->data==NULL )
     {
     Warning( "Could not parse image %s/%s", nickName, fileName );
+    FreeImage( &image );
     FREE( fileData );
     return -5;
     }

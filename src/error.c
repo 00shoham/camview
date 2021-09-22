@@ -126,3 +126,19 @@ void Notice( char* fmt, ... )
   mysyslog( "NOTICE", buf );
   return;
   }
+
+void SegFaultHandler( int signo )
+  {
+  syslog( LOG_USER|LOG_ERR, "Segmentation fault!" );
+
+  void* callStack[128];
+  int stackDepth = backtrace( callStack, sizeof(callStack) );
+  char** strings = backtrace_symbols( callStack, stackDepth );
+  for( int i=0; i<stackDepth; ++i )
+    {
+    syslog( LOG_USER|LOG_ERR, "Stack [%d] --> [%s]", i, strings[i] );
+    }
+
+  exit(1);
+  }
+

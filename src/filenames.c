@@ -2,7 +2,13 @@
 
 _FILENAME* NewFilename( char* name, _FILENAME* list )
   {
-  _FILENAME* f = (_FILENAME*)malloc( sizeof( _FILENAME ) );
+  if( EMPTY( name ) )
+    return list;
+
+  _FILENAME* f = (_FILENAME*)calloc( 1, sizeof( _FILENAME ) );
+  if( f==NULL )
+    return list;
+
   f->name = strdup( name );
   f->next = list;
   return f;
@@ -13,8 +19,12 @@ void FreeFilenames( _FILENAME* list )
   while( list!=NULL )
     {
     _FILENAME* next = list->next;
-    FREEIFNOTNULL( list->name );
-    FREEIFNOTNULL( list );
+    if( list->name != NULL )
+      {
+      free( list->name );
+      list->name = NULL;
+      }
+    free( list );
     list = next;
     }
   }
@@ -44,18 +54,26 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
     }
 
   ptr = buf;
-  while( list && size>0 )
+  while( list!=NULL && size>0 )
     {
-    snprintf( ptr, size, " %s", list->name );
-    int n = strlen( ptr );
-    size -= n;
-    ptr += n;
+    if( NOTEMPTY( list->name ) )
+      {
+      int n = strlen( list->name );
+      if( size > (n+2) )
+        {
+        strcpy( ptr, " " );
+        ++ptr;
+        strcpy( ptr, list->name );
+        ptr += n;
+        size = size - n - 1;
+        }
+      }
     list = list->next;
     }
 
   if( size<=0 )
     {
-    Warning("Trying to dump too many filenames into the (backup) command buffer");
+    Warning( "Trying to dump too many filenames into the (backup) command buffer" );
     return;
     }
 
@@ -74,8 +92,8 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
   pid_t childProc = fork();
   if( childProc<0 )
     {
-    Warning( "No backup because cannot fork(%d) - %d/%s", (int)childProc,
-             errno, strerror(errno) );
+    Warning( "No backup because cannot fork (%d) - %d/%s", (int)childProc,
+             errno, NULLPROTECT( strerror(errno) ) );
     return;
     }
 
@@ -84,7 +102,7 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
     /* in child */
     if( chdir( parentFolder )!=0 )
       {
-      Warning( "No backup because cannot chdir(%s) - %d:%s ", parentFolder, errno, strerror( errno ) );
+      Warning( "No backup because cannot chdir (%s) - %d:%s ", parentFolder, errno, NULLPROTECT( strerror( errno ) ) );
       exit( 0 );
       }
     else
@@ -93,18 +111,18 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
       }
 
     int err = 0;
-    if( (err=system( expandedbuf ))<0 )
+    if( (err=system( expandedbuf )) < 0 )
       {
       Error( "Tried to run backup command [%s] - failed with error %d - %d - %s",
-             expandedbuf, err, errno, strerror( errno ) );
+             expandedbuf, err, errno, NULLPROTECT( strerror( errno ) ) );
       }
 
     /* in case the OS needs some help cleaning up.  probably useless.
        definitely harmless as it's in the child process. */
-    sleep(1);
+    sleep( 1 );
 
     /* this function was the sole purpose of the child process, so exit. */
-    exit(0);
+    exit( 0 );
     }
   else
     {

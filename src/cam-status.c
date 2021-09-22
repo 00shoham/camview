@@ -45,7 +45,7 @@ long GetMonitorPID()
       break;
       }
     }
-  (void)pclose( f );
+  fclose( f );
 
   return mainPid;
   }
@@ -70,7 +70,7 @@ int DoesProcessExist( long pid )
       break;
       }
     }
-  (void)pclose( f );
+  fclose( f );
 
   if( gotIt )
     return 0;

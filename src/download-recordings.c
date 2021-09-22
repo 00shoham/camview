@@ -172,25 +172,11 @@ char* ExecuteDownload( int* cameras,
   char* end = status + sizeof(status)-1;
   *ptr = 0;
 
-  /*
-  Notice( "ExecuteDownload( %p, %s, %s, %s, %s, %d, %p, %p )",
-          cameras,
-          NULLPROTECT(fromDate),
-          NULLPROTECT(fromTime),
-          NULLPROTECT(toDate),
-          NULLPROTECT(toTime),
-          (int)df,
-          guidPtr,
-          fileNamePtr );
-  */
-
   EnsureDirExists( glob_conf->downloadDir );
 
   char listFileName[ BUFLEN/2 ];
   listFileName[0] = 0;
   (void)ListFileName( listFileName, sizeof( listFileName ) );
-
-  /* Notice( "ED - listfilename = %s", NULLPROTECT(listFileName) ); */
 
   FILE* listFile = NULL;
   if( df!=df_count )
@@ -222,16 +208,13 @@ char* ExecuteDownload( int* cameras,
         }
 
       CameraBackupFolder( glob_conf, cam );
-      /* Notice( "ED - working on images from %s", NULLPROTECT(cam->backupFolderPath) ); */
 
       int nImages = 0;
       char** images = NULL;
       nImages = FindMatchingImages( cam, fromDate, fromTime, toDate, toTime, &images );
-      /* Notice( "ED - %d matching images", nImages ); */
 
       /* regardless of format - show how many images match per camera */
       snprintf( ptr, end-ptr, "%s: %d<br/>\n", cam->nickName, nImages );
-      /* Notice( "ED - show %s", ptr ); */
       ptr += strlen( ptr );
 
       if( df!=df_count )
@@ -274,7 +257,6 @@ char* ExecuteDownload( int* cameras,
     {
     fclose( listFile );
     listFile = NULL;
-    /* Notice( "ED - closed listFile" ); */
     }
 
   int err = chdir( glob_conf->backupDir );
@@ -286,7 +268,7 @@ char* ExecuteDownload( int* cameras,
     }
   else
     {
-    /* Notice( "Changed folder to %s", glob_conf->backupDir ); */
+    Notice( "Changed folder to %s", glob_conf->backupDir );
     }
 
   /* work out the output filename: */
@@ -306,21 +288,21 @@ char* ExecuteDownload( int* cameras,
     char cmd[BUFLEN];
 
     snprintf( cmd, sizeof(cmd)-1,
-              "/bin/tar --create --verbose --files-from='%s' --file='%s'",
-              listFileName,
-              archiveFile );
-    /* Notice( "Running: [%s]", cmd ); */
-    err = RunCommand( 1, 1, cmd );
-    if( err )
+              "/bin/tar cf '%s' --files-from=%s",
+              archiveFile,
+              listFileName );
+    Notice( "Running - %s", cmd );
+    err = system( cmd );
+    if( err!=0 )
       {
       snprintf( ptr, end-ptr, "Failed to run tar: %d/%s",
-                errno, strerror( errno ) );
+                err, strerror( err ) );
       ptr += strlen( ptr );
-      Warning( "Command failed to run: %d - %s", errno, strerror(errno) );
+      Warning( "Command returned error %d - %d - %s", err, errno, strerror(errno) );
       }
     else
       {
-      /* Notice( "Command launched successfully" ); */
+      Notice( "Run was successful" );
       }
     }
   else if( df==df_mp4 )
@@ -328,14 +310,27 @@ char* ExecuteDownload( int* cameras,
     char cmd[BUFLEN];
 
     snprintf( cmd, sizeof(cmd)-1,
-              "/usr/bin/ffmpeg -y"
+              "cat `cat %s`"
+              " | /usr/bin/ffmpeg -y"
               " -framerate 1 "
               " -f image2pipe -i -"
               " -pix_fmt yuv420p"
               " '%s'",
+              listFileName,
               archiveFile );
-    /* Notice("Running - %s", cmd ); */
-    RunCommandWithManyFilesOnStdin( cmd, listFileName );
+    Notice("Running - %s", cmd );
+    err = system( cmd );
+    if( err!=0 )
+      {
+      snprintf( ptr, end-ptr, "Failed to run ffmpeg: %d/%s",
+                err, strerror( err ) );
+      ptr += strlen( ptr );
+      Warning( "Command returned error %d - %d - %s", err, errno, strerror(errno) );
+      }
+    else
+      {
+      Notice( "Run was successful" );
+      }
     }
   else if( df==df_count )
     {
@@ -366,7 +361,7 @@ char* ExecuteDownload( int* cameras,
 
   if( NOTEMPTY( listFileName ) )
     {
-    /* unlink( listFileName ); */
+    unlink( listFileName );
     }
 
   return strdup( status );
@@ -588,7 +583,7 @@ void CGIBody()
     }
   else
     {
-    /* Notice( "Changed folder to %s", cwd ); */
+    Notice( "Changed folder to %s", cwd );
     }
 
   char* template = NULL;
@@ -660,7 +655,7 @@ void TryToSendFileByGuid( char* guid )
         else
           {
           CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
-          Error( "The file %s cannot be found (probably expired) - try again.", filePath );
+          Error( "This file has expired - try again." );
           }
         }
       }
