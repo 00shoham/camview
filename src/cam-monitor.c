@@ -73,21 +73,6 @@ int main( int argc, char** argv )
       }
     }
 
-  /*
-  if( config!=NULL && NOTEMPTY( config->logFile ) )
-    {
-    int newStdout = open( config->logFile, O_WRONLY|O_CREAT|O_APPEND,
-                          S_IRUSR| S_IWUSR| S_IRGRP| S_IROTH );
-    if( newStdout<0 )
-      {
-      Error( "Failed to open|create|append log file %s (%d:%s)",
-             config->logFile, errno, strerror(errno) );
-      }
-    dup2( newStdout, STDOUT_FILENO );
-    dup2( newStdout, STDERR_FILENO );
-    }
-  */
-
   pid_t childProcess = 0;
   if( ! consoleOnly )
     {
@@ -101,9 +86,9 @@ int main( int argc, char** argv )
       config->logFileHandle = fopen( config->logFile, "a" );
       }
 
-    Notice("***************");
-    Notice("**  STARTUP  **");
-    Notice("***************");
+    Notice( "***************" );
+    Notice( "**  STARTUP  **" );
+    Notice( "***************" );
 
     pid_t mypid = getpid();
     Notice( "Launched service.  In child process. My PID is %ld",
@@ -111,16 +96,6 @@ int main( int argc, char** argv )
 
     int n = LaunchAllCameras( config );
     Notice("Launched %d cameras.  Monitoring...", n );
-
-    /*
-    if( !consoleOnly
-        && mypid
-        && config!=NULL
-        && config->hup_interval>0 )
-      {
-      SendPeriodicHangup( mypid, config->hup_interval );
-      }
-    */
 
     MonitorCameras( config );
     }

@@ -1,6 +1,9 @@
 #include "base.h"
 #include "nargv.h"
 
+#undef DEBUG
+/* #define DEBUG 1 */
+
 _CONFIG* glob_conf=NULL;
 void StopCaptureProcesses()
   {
@@ -432,13 +435,20 @@ void StoreImageIfDifferent( _CONFIG* config,
                             _IMAGE* imageB )
   {
   double motionPercent = 0;
-  /*
-  if( cam->debug )
-    {
+
+  if( imageA==NULL
+      || imageB==NULL
+      || imageA->data==NULL
+      || imageB->data==NULL
+      || imageA->fileName==NULL
+      || imageB->fileName==NULL )
+    return;
+
+#ifdef DEBUG
     Notice( "Testing whether %s/%s and %s differ",
-            cam->nickName, fileName, prevFile );
-   }
-  */
+            cam->nickName, imageA->fileName, imageB->fileName );
+#endif
+
   int motion = HasImageChanged( 0,
                                 cam->nickName, imageA, imageB,
                                 cam->color_dark,
@@ -456,12 +466,11 @@ void StoreImageIfDifferent( _CONFIG* config,
                                 NULL,
                                 NULL );
 
-  if( cam->debug )
-    {
+#ifdef DEBUG
     Notice( "Compared %s / %s to %s - %8.4lf - %s",
             cam->nickName, imageA->fileName, imageB->fileName, motionPercent,
             motion==0 ? "MOTION" : "STATIC" );
-    }
+#endif
 
   if( motion==0 )
     {
@@ -470,7 +479,9 @@ void StoreImageIfDifferent( _CONFIG* config,
       /* Notice("Storing pre-motion image %s/%s", cam->nickName, imageB->fileName ); */
       StoreImage( config, cam, imageB->fileName, FileSize2( cam->folderPath, imageB->fileName), -1 );
       }
-    /* Notice("Storing image due to motion (%s/%s - %8.2lf)", cam->nickName, imageA->fileName, motionPercent ); */
+#ifdef DEBUG
+    Notice("Storing image due to motion (%s/%s - %8.2lf)", cam->nickName, imageA->fileName, motionPercent );
+#endif
     StoreImage( config, cam, imageA->fileName, FileSize2( cam->folderPath, imageA->fileName), 0 );
     cam->motionCountdown = cam->motionFrames;
     return;
@@ -504,7 +515,8 @@ typedef struct _NewImageData
 
 void* ProcessNewImageInThread( void* params )
   {
-  if( params==NULL ) return NULL;
+  if( params==NULL )
+    return NULL;
 
   _NEWIMAGEDATA* tparams = (_NEWIMAGEDATA*)params;
 
@@ -513,18 +525,24 @@ void* ProcessNewImageInThread( void* params )
   char* fileName = tparams->fileName;
   char* prevFile = tparams->prevFile;
 
-  /* printf("ProcessNewImage(%s)\n", cam->nickName); */
-  if( config==NULL || cam==NULL || EMPTY( fileName ) )
+  if( config==NULL || cam==NULL || EMPTY( cam->nickName ) || EMPTY( fileName ) )
     {
     FREEIFNOTNULL( fileName );
     FREEIFNOTNULL( prevFile );
     return NULL;
     }
 
+#ifdef DEBUG
+  Notice( "ProcessNewImageInThread(%s)", cam->nickName);
+#endif
+
   /* don't process the same file twice */
   if( NOTEMPTY( cam->lastImageSourceName )
       && strcmp( cam->lastImageSourceName, fileName )==0 )
     {
+#ifdef DEBUG
+  Notice( "Skip reprocessing image %s in camera %s", fileName, cam->nickName );
+#endif
     ++ cam->lastImageCount;
     if( cam->lastImageCount >= IMAGE_TOO_OLD )
       {
@@ -567,7 +585,9 @@ void* ProcessNewImageInThread( void* params )
   if( cam->motionCountdown )
     {
     -- cam->motionCountdown;
-    /* Notice("Storing image due to countdown (%s/%s - %d)", cam->nickName, fileName, cam->motionCountdown ); */
+#ifdef DEBUG
+    Notice("Storing image due to countdown (%s/%s - %d)", cam->nickName, fileName, cam->motionCountdown );
+#endif
     StoreImage( config, cam, fileName, size, 0 );
     FREEIFNOTNULL( fileName );
     FREEIFNOTNULL( prevFile );
@@ -578,7 +598,9 @@ void* ProcessNewImageInThread( void* params )
   int age = time(NULL) - cam->lastImageTime;
   if( age >= cam->minimumIntervalSeconds )
     {
-    /* Notice("Storing image due to timeout (%s/%s - %d)", cam->nickName, fileName, age ); */
+#ifdef DEBUG
+    Notice("Storing image due to timeout (%s/%s - %d)", cam->nickName, fileName, age );
+#endif
     StoreImage( config, cam, fileName, size, 0 );
     FREEIFNOTNULL( fileName );
     FREEIFNOTNULL( prevFile );
@@ -586,18 +608,25 @@ void* ProcessNewImageInThread( void* params )
     }
 
   /* read image, check if it's too dark? */
-  /* Notice( "Reading JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, fileName ); */
+#ifdef DEBUG
+  Notice( "Reading JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, fileName );
+#endif
   _IMAGE* image = ImageFromJPEGFile2( cam->nickName, cam->folderPath, fileName );
-  if( image!=NULL )
+
+  if( image==NULL )
     {
-    FreeImage( &image );
+    Warning( "Failed to get JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, fileName );
     FREEIFNOTNULL( fileName );
     FREEIFNOTNULL( prevFile );
     return NULL;
     }
+
   int luminosity = AverageImageLuminosity( image );
   if( luminosity <= BLACK_IMAGE_MAX_LUMINOSITY )
     {
+#ifdef DEBUG
+  Notice( "Image from camera %s is too dark.", cam->nickName );
+#endif
     /* keep the image around though - we might want to
        compare against it later */
     FreePrevImage( NULL, cam );
@@ -608,19 +637,27 @@ void* ProcessNewImageInThread( void* params )
     }
 
   /* look for motion: */
+#ifdef DEBUG
+  Notice( "Motion detection on camera %s required", cam->nickName );
+#endif
+
   _IMAGE* prevImage = NULL;
   if( NOTEMPTY( prevFile )
       && cam->recentImage!=NULL
       && NOTEMPTY( cam->recentImage->fileName )
       && strcmp( cam->recentImage->fileName, prevFile )==0 )
     { /* use the image file we've already got from last time */
-    /* Notice( "Using recent image (%s/%s)", cam->nickName, cam->recentImage->fileName ); */
+#ifdef DEBUG
+    Notice( "Using previously parsed JPEG (%s/%s)", cam->nickName, cam->recentImage->fileName );
+#endif
     prevImage = cam->recentImage;
     }
   else
     { /* free the cached image file - it's no good */
     FreeImage( &(cam->recentImage) );
-    /* Notice( "Reading prev JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, prevFile ); */
+#ifdef DEBUG
+    Notice( "Parsing JPEG for previous image from %s - %s / %s", cam->nickName, cam->folderPath, prevFile );
+#endif
     prevImage = ImageFromJPEGFile2( cam->nickName, cam->folderPath, prevFile );
     }
 
@@ -650,16 +687,14 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   {
   if( config==NULL )
     return;
-  if( cam==NULL )
+  if( cam==NULL || EMPTY( cam->nickName ) )
     return;
   if( fileName==NULL )
     return;
 
-  /*
-  Notice( "ProcessNewImage( <conf> , %s, %s, %s )",
+  Notice( "ProcessNewImage( <conf> , %s, %s, %s, HMDT=%d )",
           cam->nickName, NULLPROTECT( fileName ),
-          NULLPROTECT( prevFile ) );
-  */
+          NULLPROTECT( prevFile ), cam->haveMotionDetectThread );
   if( cam->haveMotionDetectThread )
     {
     pthread_join( cam->motionDetectThread, NULL );
@@ -690,6 +725,9 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
 
   if( err==0 )
     {
+#ifdef DEBUG
+    Warning( "Created motion detection thread for camera %s", cam->nickName );
+#endif
     cam->haveMotionDetectThread = 1;
     }
   else
@@ -706,13 +744,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
 
 void ScanFolderForNewFiles( _CONFIG* config, _CAMERA* cam )
   {
-  /*
-  char *camID = NULL;
-  if( cam ) camID=cam->nickName;
-  Notice( "ScanFolderForNewFiles( %s )", NULLPROTECT( camID ) );
-  */
-
-  /* printf("ScanFolderForNewFiles(%s)\n", cam->nickName); */
   if( EMPTY( cam->folderPath ) )
     {
     Warning("Empty folder path for camera [%s]", NULLPROTECT( cam->nickName ) );
@@ -721,7 +752,9 @@ void ScanFolderForNewFiles( _CONFIG* config, _CAMERA* cam )
 
   char** folder = NULL;
   int nFiles = GetOrderedDirectoryEntries( cam->folderPath, "test-image-", ".jpg", &folder, 1 );
-  /* Notice( "Folder %s has %d files", cam->folderPath, nFiles ); */
+#ifdef DEBUG
+  Notice( "Folder %s has %d files", cam->folderPath, nFiles );
+#endif
   if( nFiles<0 )
     {
     return;
@@ -822,7 +855,6 @@ int MonitorSingleCamera( _CONFIG* config, _CAMERA* cam )
     return -1;
     }
 
-  /* printf("MonitorSingleCamera ... child=%d, num=%d\n", (int)(cam->childProcess), cam->launchAttempts ); */
   if( cam->childProcess<=0 )
     {
     if( cam->launchAttempts < MAX_LAUNCH_ATTEMPTS )
@@ -853,12 +885,6 @@ int MonitorSingleCamera( _CONFIG* config, _CAMERA* cam )
       && procExists==0
       && NOTEMPTY( cam->folderPath ) )
     {
-    /* should no longer be required.
-    if( chdir( cam->folderPath )!=0 )
-      {
-      Error("Failed to chdir to %s - %d:%s", cam->folderPath, errno, strerror(errno) );
-      }
-    */
     ScanFolderForNewFiles( config, cam );
     }
   else
