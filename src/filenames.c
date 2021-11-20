@@ -110,8 +110,13 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
       /* Notice( "Changed directory to %s prior to backup", parentFolder ); */
       }
 
-    int err = 0;
-    if( (err=system( expandedbuf )) < 0 )
+    int err = system( expandedbuf );
+    if( err==-1 && errno==ECHILD )
+      { /* just means the child exited before we could pull an error number from it */
+      err = 0;
+      }
+
+    if( err < 0 )
       {
       Error( "Tried to run backup command [%s] - failed with error %d - %d - %s",
              expandedbuf, err, errno, NULLPROTECT( strerror( errno ) ) );

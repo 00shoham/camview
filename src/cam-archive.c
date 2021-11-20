@@ -125,6 +125,11 @@ void MakeTarBall( int doRemove, _CAMERA* cam, char* when )
   snprintf( cmd, sizeof(cmd)-1, "/usr/bin/find . -type f -name \"*%s*jpg\" -print0 > .list", when );
   printf("Running [%s]\n", cmd );
   int err = system( cmd );
+  if( err==-1 && errno==ECHILD )
+    { /* child exited, no return code */
+    err = 0;
+    }
+
   if( err!=0 )
     {
     printf("Failed to generate list file!  No archive and keeping images\n");
@@ -141,6 +146,11 @@ void MakeTarBall( int doRemove, _CAMERA* cam, char* when )
   printf("Running [%s]\n", cmd );
 
   err = system( cmd );
+  if( err==-1 && errno==ECHILD )
+    { /* child exited, no return code */
+    err = 0;
+    }
+
   if( err==0 )
     {
     printf("Success!\n");

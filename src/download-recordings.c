@@ -293,6 +293,11 @@ char* ExecuteDownload( int* cameras,
               listFileName );
     Notice( "Running - %s", cmd );
     err = system( cmd );
+    if( err==-1 && errno==ECHILD )
+      { /* child exited, no return code */
+      err = 0;
+      }
+
     if( err!=0 )
       {
       snprintf( ptr, end-ptr, "Failed to run tar: %d/%s",
@@ -320,6 +325,11 @@ char* ExecuteDownload( int* cameras,
               archiveFile );
     Notice("Running - %s", cmd );
     err = system( cmd );
+    if( err==-1 && errno==ECHILD )
+      { /* child exited, no return code */
+      err = 0;
+      }
+
     if( err!=0 )
       {
       snprintf( ptr, end-ptr, "Failed to run ffmpeg: %d/%s",
