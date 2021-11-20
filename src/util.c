@@ -180,8 +180,8 @@ int GetOrderedDirectoryEntries( const char* path,
   while( (de=readdir( d ))!=NULL )
     {
     if( NOTEMPTY( de->d_name )
-        && ( suffix==NULL || StringEndsWith( de->d_name, suffix, 0 )==0 )
-        && ( prefix==NULL || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
+        && ( EMPTY( suffix ) || StringEndsWith( de->d_name, suffix, 0 )==0 )
+        && ( EMPTY( prefix ) || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
       {
       ++nEntries;
       }
@@ -202,8 +202,8 @@ int GetOrderedDirectoryEntries( const char* path,
   while( (de=readdir( d ))!=NULL && n<nEntries )
     {
     if( NOTEMPTY( de->d_name )
-        && ( suffix==NULL || StringEndsWith( de->d_name, suffix, 0 )==0 )
-        && ( prefix==NULL || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
+        && ( EMPTY( suffix ) || StringEndsWith( de->d_name, suffix, 0 )==0 )
+        && ( EMPTY( prefix ) || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
       {
       entries[ n ] = strdup( de->d_name );
       ++n;
@@ -635,7 +635,7 @@ int StringEndsWith( const char* string, const char* suffix, int caseSensitive )
     return -2;
     }
 
-  if( caseSensitive )
+  if( caseSensitive==0 )
     {
     return strcasecmp( string + ls - lu, suffix );
     }
@@ -658,7 +658,7 @@ int StringStartsWith( const char* string, const char* prefix, int caseSensitive 
     return -2;
     }
 
-  if( caseSensitive )
+  if( caseSensitive==0 )
     {
     return strncasecmp( string, prefix, strlen(prefix) );
     }

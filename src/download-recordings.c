@@ -655,7 +655,7 @@ void TryToSendFileByGuid( char* guid )
         else
           {
           CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
-          Error( "This file has expired - try again." );
+          Error( "The file [%s] has expired - try again.", filePath );
           }
         }
       }
