@@ -692,9 +692,12 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   if( fileName==NULL )
     return;
 
+#ifdef DEBUG
   Notice( "ProcessNewImage( <conf> , %s, %s, %s, HMDT=%d )",
           cam->nickName, NULLPROTECT( fileName ),
           NULLPROTECT( prevFile ), cam->haveMotionDetectThread );
+#endif
+
   if( cam->haveMotionDetectThread )
     {
     pthread_join( cam->motionDetectThread, NULL );
