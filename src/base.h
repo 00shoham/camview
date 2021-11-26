@@ -10,12 +10,15 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/wait.h>
 #include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
 #include <regex.h>
 #include <ctype.h>
 #include <locale.h>
+#include <pwd.h>
+#include <grp.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <syslog.h>
@@ -24,6 +27,13 @@
 #include <math.h>
 #include <pthread.h>
 #include <execinfo.h>
+
+#define INVALID_INT -999999
+#define INVALID_DOUBLE -99999.0
+
+enum callMethod { cm_invalid, cm_ui, cm_api };
+
+#define DEFAULT_USER_ENV_VAR "REMOTE_USER"
 
 void Error( char* fmt, ... );
 void Warning( char* fmt, ... );
@@ -107,6 +117,7 @@ void SegFaultHandler( int signo );
 #define MAX_FORWARD 20
 
 #include "util.h"
+#include "nargv.h"
 #include "image.h"
 #include "config.h"
 #include "daemon.h"

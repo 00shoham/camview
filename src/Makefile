@@ -39,7 +39,7 @@ all: $(BIN)
 CC=gcc
 # CFLAGS=-Wall -O2 -g -rdynamic -fsanitize=address
 CFLAGS=-Wall -O2
-LIBS=-ljpeg -lpthread -lm
+LIBS=-ljpeg -lpthread -lm -luuid
 SHAREDOBJ=\
   cgi.o\
   config.o\

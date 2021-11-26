@@ -97,7 +97,7 @@ char* LogDownload( char* filePath )
     Error( "Cannot log a download - no config file or download dir" );
     }
 
-  char* guid = GUID();
+  char* guid = GenerateAllocateGUID();
 
   time_t t = time( NULL );
   t += DOWNLOAD_EXPIRY_SECONDS;

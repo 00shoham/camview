@@ -60,6 +60,7 @@ int main( int argc, char** argv )
       && NOTEMPTY( config->logFile )
       && FileExists( config->logFile )==0 )
     {
+    /* QQQ rotate the old log file */
     (void)unlink( config->logFile );
     }
 
