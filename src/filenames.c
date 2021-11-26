@@ -66,6 +66,7 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
         strcpy( ptr, list->name );
         ptr += n;
         size = size - n - 1;
+        *ptr = 0;
         }
       }
     list = list->next;
