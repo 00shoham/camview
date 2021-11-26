@@ -1,19 +1,21 @@
 #ifndef _INCLUDE_BASE
 #define _INCLUDE_BASE
 
+#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/types.h>
+#include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
 #include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
 #include <regex.h>
 #include <ctype.h>
 #include <locale.h>
-#include <unistd.h>
 #include <signal.h>
 #include <sys/stat.h>
 #include <syslog.h>

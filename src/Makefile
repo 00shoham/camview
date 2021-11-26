@@ -16,6 +16,7 @@ WEBDOCS=\
   right-small.png
 
 BIN=\
+  test-filelock\
   cam-monitor\
   cam-archive\
   cam-config\
