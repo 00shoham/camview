@@ -224,6 +224,40 @@ pid_t LaunchCapture( _CONFIG* config, _CAMERA* cam )
     Error("Cannot launch capture of a camera with no name");
   if( EMPTY( cam->captureCommand ) )
     Error("Cannot launch capture of a camera with no capture command");
+
+  Notice( "LaunchCapture on %s", cam->nickName );
+
+  /* do we already have one?  if so, kill it first. */
+  if( ProcessExistsAndIsMine( cam->childProcess )==0 )
+    {
+    Notice("LaunchCapture( %s ) -- process already exists", cam->nickName );
+    int err = 0;
+
+    err = kill( cam->childProcess, SIGHUP );
+    if( err==0 )
+      {
+      sleep(1);
+      if( ProcessExistsAndIsMine( cam->childProcess )==0 )
+        { /* needs a more brutal kill */
+        Warning( "LaunchCapture( %s ) -- kill -1 not enough", cam->nickName );
+        err = kill( cam->childProcess, SIGKILL );
+        sleep(1);
+        if( ProcessExistsAndIsMine( cam->childProcess )==0 )
+          {
+          Warning( "LaunchCapture( %s ) -- kill -9 not enough!!", cam->nickName );
+          }
+        }
+      }
+    else
+      {
+      Warning( "LaunchCapture( %s ) -- failed to kill -HUP existing child", cam->nickName );
+      }
+    }
+  else
+    {
+    Notice( "LaunchCapture on %s - no legacy process.", cam->nickName );
+    }
+
   cam->childProcess = 0;
   cam->lastImageTime = 0;
 
