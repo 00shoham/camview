@@ -112,7 +112,9 @@ _IMAGE* ImageFromJPEGFile( char* nickName, char* fileName )
 _IMAGE* ImageFromJPEGFile2( char* nickName, char* path, char* fileName )
   {
   char* fullPath = MakeFullPath( path, fileName );
-  return ImageFromJPEGFile( nickName, fullPath );
+  _IMAGE* ptr = ImageFromJPEGFile( nickName, fullPath );
+  FREE( fullPath );
+  return ptr;
   }
 
 int CompressJPEG( _IMAGE* img, char* fileName, int quality )
