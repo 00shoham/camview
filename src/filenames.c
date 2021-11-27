@@ -32,9 +32,10 @@ void FreeFilenames( _FILENAME* list )
 void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
   {
   char buf[BIGBUF];
-  char expandedbuf[2*BIGBUF];
-  char* ptr;
-  int size = sizeof(buf)-1;
+  char cmdWithFilenames[2*BIGBUF];
+  char* ptr = NULL;
+  int spaceRemaining = sizeof(buf)-1;
+  int err = 0;
 
   if( EMPTY( parentFolder ) )
     {
@@ -54,25 +55,25 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
     }
 
   ptr = buf;
-  while( list!=NULL && size>0 )
+  while( list!=NULL && spaceRemaining>0 )
     {
     if( NOTEMPTY( list->name ) )
       {
       int n = strlen( list->name );
-      if( size > (n+2) )
+      if( spaceRemaining > (n+2) )
         {
         strcpy( ptr, " " );
         ++ptr;
         strcpy( ptr, list->name );
         ptr += n;
-        size = size - n - 1;
+        spaceRemaining -= (n + 1);
         *ptr = 0;
         }
       }
     list = list->next;
     }
 
-  if( size<=0 )
+  if( spaceRemaining<1 )
     {
     Warning( "Trying to dump too many filenames into the (backup) command buffer" );
     return;
@@ -80,59 +81,43 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
 
   /* expand buf into the command and perhaps run it */
   _TAG_VALUE* tv = NewTagValue( "FILES", buf, NULL, 0 );
-  int nReplacements = ExpandMacros( cmd, expandedbuf, sizeof( expandedbuf)-1, tv );
+  int nReplacements = ExpandMacros( cmd, cmdWithFilenames, sizeof( cmdWithFilenames )-1, tv );
   FreeTagValue( tv );
 
   if( nReplacements!=1 )
     {
-    Warning("Backup command did not include %%FILES%% - aborting.");
+    Warning( "Backup command did not include %%FILES%% - aborting." );
     return;
     }
-  /* Notice("Command generation returned %d - will run [%s]", err, expandedbuf ); */
+  /* Notice("Command generation returned %d - will run [%s]", err, cmdWithFilenames ); */
 
-  pid_t childProc = fork();
-  if( childProc<0 )
+  char oldLocation[BUFLEN];
+  ptr = getcwd( oldLocation, sizeof( oldLocation )-1 );
+  if( EMPTY( ptr ) )
     {
-    Warning( "No backup because cannot fork (%d) - %d/%s", (int)childProc,
-             errno, NULLPROTECT( strerror(errno) ) );
+    Warning( "Backup command not run because could not getcwd() - %d:%s",
+             errno, strerror( errno ) );
     return;
     }
 
-  if( childProc==0 )
+  err = chdir( parentFolder );
+  if( err )
     {
-    /* in child */
-    if( chdir( parentFolder )!=0 )
-      {
-      Warning( "No backup because cannot chdir (%s) - %d:%s ", parentFolder, errno, NULLPROTECT( strerror( errno ) ) );
-      exit( 0 );
-      }
-    else
-      {
-      /* Notice( "Changed directory to %s prior to backup", parentFolder ); */
-      }
-
-    int err = system( expandedbuf );
-    if( err==-1 && errno==ECHILD )
-      { /* just means the child exited before we could pull an error number from it */
-      err = 0;
-      }
-
-    if( err < 0 )
-      {
-      Error( "Tried to run backup command [%s] - failed with error %d - %d - %s",
-             expandedbuf, err, errno, NULLPROTECT( strerror( errno ) ) );
-      }
-
-    /* in case the OS needs some help cleaning up.  probably useless.
-       definitely harmless as it's in the child process. */
-    sleep( 1 );
-
-    /* this function was the sole purpose of the child process, so exit. */
-    exit( 0 );
-    }
-  else
-    {
-    /* in parent - return to caller*/
+    Warning( "Backup command failed to chdir to [%s] - %d:%d:%s",
+             parentFolder, err, errno, strerror( errno ) );
     return;
+    }
+
+  Notice( "Backup using [%s] in [%s]", cmdWithFilenames, parentFolder );
+  err = AsyncRunCommandNoIO( cmdWithFilenames );
+  if( err )
+    Warning( "AsyncRunCommandNoIO() --> %d", err );
+
+  if( NOTEMPTY( ptr ) )
+    {
+    err = chdir( ptr );
+    if( err )
+      Warning( "Backup command failed to return to [%s] - %d:%d:%s",
+               ptr, err, errno, strerror( errno ) );
     }
   }
