@@ -3,6 +3,47 @@
 #undef DEBUG
 /* #define DEBUG 1 */
 
+void SetDefaultsSingleCamera( _CONFIG* config, _CAMERA* cam )
+  {
+  cam->minimumIntervalSeconds = config->minimumIntervalSeconds;
+  cam->storePreMotion = config->storePreMotion;
+  cam->motionFrames = config->motionFrames;
+  cam->color_diff_threshold = config->color_diff_threshold;
+  cam->color_dark = config->color_dark;
+  cam->dark_brightness_boost = config->dark_brightness_boost;
+  cam->despeckle_dark_threshold = config->despeckle_dark_threshold;
+  cam->despeckle_nondark_min = config->despeckle_nondark_min;
+  cam->despeckle_bright_threshold = config->despeckle_bright_threshold;
+  cam->despeckle_nonbright_max = config->despeckle_nonbright_max;
+  cam->checkerboard_square_size = config->checkerboard_square_size;
+  cam->checkerboard_min_white = config->checkerboard_min_white;
+  cam->checkerboard_num_white = config->checkerboard_num_white;
+  cam->checkerboard_percent = config->checkerboard_percent;
+  if( pthread_mutex_init( &(cam->lock), NULL )!=0 )
+    {
+    Error( "Failed to init a mutex for camera %s", NULLPROTECT( cam->nickName ) );
+    }
+  }
+
+void FreeCamera( _CAMERA* cam )
+  {
+  if( cam==NULL )
+    return;
+
+  FreeImage( &(cam->recentImage) );
+  FreeIfAllocated( &(cam->nickName) );
+  FreeIfAllocated( &(cam->ipAddress) );
+  FreeIfAllocated( &(cam->captureCommand) );
+  FreeIfAllocated( &(cam->folderPath) );
+  FreeIfAllocated( &(cam->backupFolderPath) );
+  FreeIfAllocated( &(cam->lastStoredImage) );
+  FreeIfAllocated( &(cam->lastImageSourceName) );
+
+  (void)pthread_mutex_destroy( &(cam->lock) );
+
+  FREE( cam );
+  }
+
 _CONFIG* glob_conf=NULL;
 void StopCaptureProcesses()
   {
@@ -440,12 +481,15 @@ void KillCameraProcess( _CAMERA* cam )
   sleep(1);
   }
 
-void StoreImage( _CONFIG* config, _CAMERA* cam, char* fileName, int size, int deltaTime )
+void StoreImage( int preLocked,
+                 _CONFIG* config, _CAMERA* cam, char* fileName, int size, int deltaTime )
   {
-  pthread_mutex_lock( &(cam->lock) );
+  if( ! preLocked )
+    pthread_mutex_lock( &(cam->lock) );
+
   /*
-  Notice( "StoreImage( ..., %s, %s, %d, %d )",
-          cam->nickName, fileName, size, deltaTime );
+  Notice( "StoreImage( ..., %d, %s, %s, %d, %d )",
+          preLocked, cam->nickName, fileName, size, deltaTime );
   */
   char *nowName = TimeStampFilename( deltaTime );
   /* printf("... nowName = [%s]\n", nowName ); */
@@ -486,10 +530,12 @@ void StoreImage( _CONFIG* config, _CAMERA* cam, char* fileName, int size, int de
       }
     }
 
-  pthread_mutex_unlock( &(cam->lock) );
+  if( ! preLocked )
+    pthread_mutex_unlock( &(cam->lock) );
   }
 
-void StoreImageIfDifferent( _CONFIG* config,
+void StoreImageIfDifferent( int preLocked,
+                            _CONFIG* config,
                             _CAMERA* cam,
                             _IMAGE* imageA,
                             _IMAGE* imageB )
@@ -537,12 +583,12 @@ void StoreImageIfDifferent( _CONFIG* config,
     if( cam->storePreMotion )
       {
       /* Notice("Storing pre-motion image %s/%s", cam->nickName, imageB->fileName ); */
-      StoreImage( config, cam, imageB->fileName, FileSize2( cam->folderPath, imageB->fileName), -1 );
+      StoreImage( preLocked, config, cam, imageB->fileName, FileSize2( cam->folderPath, imageB->fileName), -1 );
       }
 #ifdef DEBUG
     Notice("Storing image due to motion (%s/%s - %8.2lf)", cam->nickName, imageA->fileName, motionPercent );
 #endif
-    StoreImage( config, cam, imageA->fileName, FileSize2( cam->folderPath, imageA->fileName), 0 );
+    StoreImage( preLocked, config, cam, imageA->fileName, FileSize2( cam->folderPath, imageA->fileName), 0 );
     cam->motionCountdown = cam->motionFrames;
     return;
     }
@@ -587,7 +633,10 @@ void* ProcessNewImageInThread( void* params )
 
   FREE( tparams );
 
-  if( config==NULL || cam==NULL || EMPTY( cam->nickName ) || EMPTY( fileName ) )
+  if( config==NULL
+      || cam==NULL
+      || EMPTY( cam->nickName )
+      || EMPTY( fileName ) )
     {
     FREEIFNOTNULL( fileName );
     FREEIFNOTNULL( prevFile );
@@ -597,6 +646,8 @@ void* ProcessNewImageInThread( void* params )
 #ifdef DEBUG
   Notice( "ProcessNewImageInThread(%s)", cam->nickName);
 #endif
+
+  pthread_mutex_lock( &(cam->lock) );
 
   /* don't process the same file twice */
   if( NOTEMPTY( cam->lastImageSourceName )
@@ -613,9 +664,7 @@ void* ProcessNewImageInThread( void* params )
       KillCameraProcess( cam );
       }
 
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    goto end;
     }
 
   /* remember what file we were working on, to avoid dups (as above) */
@@ -628,19 +677,15 @@ void* ProcessNewImageInThread( void* params )
     {
     Warning( "Image %s for camera %s too small (%d versus previous %d)",
              fileName, cam->nickName, size, cam->largestFile );
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    goto end;
     }
 
   /* first image */
   if( EMPTY( cam->lastStoredImage ) )
     {
     Notice( "Captured first image for %s - %s", cam->nickName, fileName );
-    StoreImage( config, cam, fileName, size, 0 );
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    StoreImage( 1, config, cam, fileName, size, 0 );
+    goto end;
     }
 
   /* recent motion, storing due to countdown rule */
@@ -650,10 +695,8 @@ void* ProcessNewImageInThread( void* params )
 #ifdef DEBUG
     Notice("Storing image due to countdown (%s/%s - %d)", cam->nickName, fileName, cam->motionCountdown );
 #endif
-    StoreImage( config, cam, fileName, size, 0 );
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    StoreImage( 1, config, cam, fileName, size, 0 );
+    goto end;
     }
 
   /* too much time since we last stored an image? */
@@ -663,10 +706,8 @@ void* ProcessNewImageInThread( void* params )
 #ifdef DEBUG
     Notice("Storing image due to timeout (%s/%s - %d)", cam->nickName, fileName, age );
 #endif
-    StoreImage( config, cam, fileName, size, 0 );
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    StoreImage( 1, config, cam, fileName, size, 0 );
+    goto end;
     }
 
   /* read image, check if it's too dark? */
@@ -678,9 +719,7 @@ void* ProcessNewImageInThread( void* params )
   if( image==NULL )
     {
     Warning( "Failed to get JPEG file for %s - %s / %s", cam->nickName, cam->folderPath, fileName );
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    goto end;
     }
 
   int luminosity = AverageImageLuminosity( image );
@@ -693,9 +732,7 @@ void* ProcessNewImageInThread( void* params )
        compare against it later */
     FreePrevImage( NULL, cam );
     cam->recentImage = image;
-    FREEIFNOTNULL( fileName );
-    FREEIFNOTNULL( prevFile );
-    return NULL;
+    goto end;
     }
 
   /* look for motion: */
@@ -727,11 +764,11 @@ void* ProcessNewImageInThread( void* params )
     { /* for some reason we have a bad previous image */
     Warning( "Previous image NULL or empty.  Storing current image %s.");
     prevImage = FreePrevImage( prevImage, cam );
-    StoreImage( config, cam, fileName, size, 0 );
+    StoreImage( 1, config, cam, fileName, size, 0 );
     }
   else
     {
-    StoreImageIfDifferent( config, cam, image, prevImage );
+    StoreImageIfDifferent( 1, config, cam, image, prevImage );
     prevImage = FreePrevImage( prevImage, cam );
     }
 
@@ -739,8 +776,11 @@ void* ProcessNewImageInThread( void* params )
   /* Notice( "Keeping image (%s/%s)", cam->nickName, image->fileName ); */
   cam->recentImage = image;
 
+  end:
   FREEIFNOTNULL( fileName );
   FREEIFNOTNULL( prevFile );
+
+  pthread_mutex_unlock( &(cam->lock) );
   return NULL;
   }
 
@@ -778,15 +818,15 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   tparams->fileName = SAFESTRDUP( fileName );
   tparams->prevFile = SAFESTRDUP( prevFile );
 
-  /* QQQ
   int err = pthread_create( &(cam->motionDetectThread),
                             NULL,
                             ProcessNewImageInThread,
                             (void*)tparams
                           );
-  */
+  /* QQQ
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
+  */
 
   if( err==0 )
     {

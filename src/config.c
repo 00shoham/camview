@@ -28,47 +28,6 @@ void SetDefaults( _CONFIG* config )
   config->hup_interval = DEFAULT_HUP_INTERVAL;
   }
 
-void SetDefaultsSingleCamera( _CONFIG* config, _CAMERA* cam )
-  {
-  cam->minimumIntervalSeconds = config->minimumIntervalSeconds;
-  cam->storePreMotion = config->storePreMotion;
-  cam->motionFrames = config->motionFrames;
-  cam->color_diff_threshold = config->color_diff_threshold;
-  cam->color_dark = config->color_dark;
-  cam->dark_brightness_boost = config->dark_brightness_boost;
-  cam->despeckle_dark_threshold = config->despeckle_dark_threshold;
-  cam->despeckle_nondark_min = config->despeckle_nondark_min;
-  cam->despeckle_bright_threshold = config->despeckle_bright_threshold;
-  cam->despeckle_nonbright_max = config->despeckle_nonbright_max;
-  cam->checkerboard_square_size = config->checkerboard_square_size;
-  cam->checkerboard_min_white = config->checkerboard_min_white;
-  cam->checkerboard_num_white = config->checkerboard_num_white;
-  cam->checkerboard_percent = config->checkerboard_percent;
-  if( pthread_mutex_init( &(cam->lock), NULL )!=0 )
-    {
-    Error( "Failed to init a mutex for camera %s", NULLPROTECT( cam->nickName ) );
-    }
-  }
-
-void FreeCamera( _CAMERA* cam )
-  {
-  if( cam==NULL )
-    return;
-
-  FreeImage( &(cam->recentImage) );
-  FreeIfAllocated( &(cam->nickName) );
-  FreeIfAllocated( &(cam->ipAddress) );
-  FreeIfAllocated( &(cam->captureCommand) );
-  FreeIfAllocated( &(cam->folderPath) );
-  FreeIfAllocated( &(cam->backupFolderPath) );
-  FreeIfAllocated( &(cam->lastStoredImage) );
-  FreeIfAllocated( &(cam->lastImageSourceName) );
-
-  (void)pthread_mutex_destroy( &(cam->lock) );
-
-  FREE( cam );
-  }
-
 void FreeConfig( _CONFIG* config )
   {
   _CAMERA* cam = config->cameras;
