@@ -108,7 +108,9 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
     return;
     }
 
+#ifdef DEBUG
   Notice( "Backup using [%s] in [%s]", cmdWithFilenames, parentFolder );
+#endif
   err = AsyncRunCommandNoIO( cmdWithFilenames );
   if( err )
     Warning( "AsyncRunCommandNoIO() --> %d", err );
