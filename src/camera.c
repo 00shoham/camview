@@ -776,15 +776,15 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   tparams->fileName = SAFESTRDUP(fileName);
   tparams->prevFile = SAFESTRDUP(prevFile);
 
+  /* QQQ
   int err = pthread_create( &(cam->motionDetectThread),
                             NULL,
                             ProcessNewImageInThread,
                             (void*)tparams
                           );
-  /*
+  */
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
-  */
 
   if( err==0 )
     {
