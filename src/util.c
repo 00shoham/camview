@@ -3539,5 +3539,6 @@ int RotateFile( char* path )
   if( err )
     Warning( "Failed to rename [%s] to [%s] - %d:%d:%s",
              path, newName, err, errno, strerror( errno ) );
+  FREE( newName );
   return err;
   }
