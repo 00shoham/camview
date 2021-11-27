@@ -702,7 +702,6 @@ void* ProcessNewImageInThread( void* params )
 #endif
 
   _IMAGE* prevImage = NULL;
-  int allocatedPrevImage = 0;
   if( NOTEMPTY( prevFile )
       && cam->recentImage!=NULL
       && NOTEMPTY( cam->recentImage->fileName )
@@ -720,7 +719,6 @@ void* ProcessNewImageInThread( void* params )
     Notice( "Parsing JPEG for previous image from %s - %s / %s", cam->nickName, cam->folderPath, prevFile );
 #endif
     prevImage = ImageFromJPEGFile2( cam->nickName, cam->folderPath, prevFile );
-    allocatedPrevImage = 1;
     }
 
   if( prevImage==NULL || prevImage->data==NULL )
