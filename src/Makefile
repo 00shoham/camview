@@ -37,8 +37,8 @@ WEBLOG=/mnt/ramdisk/security/cgi.log
 all: $(BIN)
 
 CC=gcc
-# CFLAGS=-Wall -O2 -g -rdynamic -fsanitize=address
-CFLAGS=-Wall -O2
+CFLAGS=-Wall -g -rdynamic -fsanitize=address
+# CFLAGS=-Wall -O2
 LIBS=-ljpeg -lpthread -lm -luuid
 SHAREDOBJ=\
   cgi.o\

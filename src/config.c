@@ -75,7 +75,7 @@ void FreeConfig( _CONFIG* config )
   while( cam!=NULL )
     {
     _CAMERA* nextCam = cam->next;
-    if( nextCam!=NULL )
+    if( cam!=NULL )
       {
       FreeCamera( cam );
       --(config->nCameras);
@@ -99,9 +99,11 @@ void FreeConfig( _CONFIG* config )
 
   FreeIfAllocated( &(config->baseDir) );
   FreeIfAllocated( &(config->backupDir) );
+  FreeIfAllocated( &(config->backupCommand) );
   FreeIfAllocated( &(config->downloadDir) );
   FreeIfAllocated( &(config->logFile) );
   FreeIfAllocated( &(config->cgiLogFile) );
+  FreeIfAllocated( &(config->configName) );
 
   if( config->logFileHandle!=NULL )
     {
@@ -146,8 +148,10 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
   char* variable = TrimHead( ptr );
   TrimTail( variable );
   char* value = TrimHead( equalsChar+1 );
-  char* originalValue = value;
   TrimTail( value );
+
+  /* indicates that we used strdup() to recompute the value ptr */
+  int allocatedValue = 0;
 
   if( NOTEMPTY( variable ) && NOTEMPTY( value ) )
     {
@@ -159,15 +163,13 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       int loopMax = 10;
       while( loopMax>0 )
         {
-        int n = ExpandMacros( value, valueBuf, sizeof( valueBuf ), config->list );
+        int n = ExpandMacros( value, valueBuf, sizeof( valueBuf )-2, config->list );
         if( n>0 )
           {
-          /* don't free the original value - that's done elsewhere */
-          if( value!=NULL && value!=originalValue )
-            {
-            free( value );
-            }
+          if( allocatedValue )
+            FREE( value );
           value = strdup( valueBuf );
+          allocatedValue = 1;
           }
         else
           {
@@ -447,6 +449,9 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       */
       }
     }
+
+  if( allocatedValue )
+    FREE( value );
   }
 
 void PrintConfig( FILE* f, _CONFIG* config )

@@ -7,17 +7,31 @@ int IsFileOpen( char* path )
     return -1;
 
   int err = fcntl( fd, F_SETLEASE, F_RDLCK );
-  printf( "fcntl returned %d\n", err );
   close( fd );
-  return 0;
+  return err;
   }
 
 int main( int argc, char** argv )
   {
+
+  /*
+  char* line;
+  int err = POpenAndSearch( "/bin/ps -ef", "firefox", &line );
+  printf( "Search for 'firefox' returned %d (%s)\n", err, NULLPROTECT( line ) );
+  FREE( line );
+  err = POpenAndSearch( "/bin/ps -ef", "firehen", &line );
+  printf( "Search for 'firehen' returned %d (%s)\n", err, NULLPROTECT( line ) );
+  */
+
   for( int i=1; i<argc; ++i )
     {
+    /*
+    int err = LockFile( argv[i] );
+    printf( "LockFile --> %d\n", err );
+    */
+
     int err = IsFileOpen( argv[i] );
-    printf( "IsFileOpen() --> %d\n", err );
+    printf( "IsFileOpen --> %d\n", err );
     }
 
   return 0;

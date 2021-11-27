@@ -296,6 +296,30 @@ pid_t LaunchCapture( _CONFIG* config, _CAMERA* cam )
   /* printf("forking %s\n", cam->nickName ); */
   Notice("Forking and running %s", cam->captureCommand );
 
+  char* commandString = NULL;
+  int nTries = 10;
+  while( POpenAndSearch( "/bin/ps -ef", cam->captureCommand, &commandString )==0
+         && nTries-- )
+    {
+    Notice( "Command [%s] already running - will try to stop it", cam->captureCommand );
+    if( NOTEMPTY( commandString ) )
+      {
+      char* ptr = NULL;
+      char* userID = strtok_r( commandString, " \t\r\n", &ptr );
+      char* processID = strtok_r( NULL, " \t\r\n", &ptr );
+      Notice( "Killing process %s which belongs to %s", processID, userID );
+      if( NOTEMPTY( processID ) && atoi( processID )>0 )
+        {
+        char killCmd[BUFLEN];
+        snprintf( killCmd, sizeof(killCmd)-1, "/bin/kill -1 %s", processID );
+        int err = AsyncRunCommandNoIO( killCmd );
+        if( err )
+          Warning( "Failed to launch [%s] - %d:%d:%s", killCmd, err, errno, strerror( errno ) );
+        }
+      FREE( commandString );
+      }
+    }
+
   pid_t child = fork();
 
   if( child<0 )

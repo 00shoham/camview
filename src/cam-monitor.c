@@ -60,8 +60,14 @@ int main( int argc, char** argv )
       && NOTEMPTY( config->logFile )
       && FileExists( config->logFile )==0 )
     {
-    /* QQQ rotate the old log file */
-    (void)unlink( config->logFile );
+    if( RotateFile( config->logFile )!=0 )
+      {
+      Warning( "Failed to rotate-out old log file %s", config->logFile );
+      int err = unlink( config->logFile );
+      if( err )
+        Warning( "Failed to unlink old log file %s - %d:%d:%s",
+                 config->logFile, err, errno, strerror( errno ) );
+      }
     }
 
   if( config!=NULL && NOTEMPTY( config->baseDir ) )
@@ -105,5 +111,6 @@ int main( int argc, char** argv )
     Notice("Child process is %d.", (int)childProcess );
     }
 
+  FreeConfig( config );
   return 0;
   }

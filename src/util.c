@@ -2604,6 +2604,37 @@ int POpenAndRead( const char *cmd, int* readPtr, pid_t* childPtr )
   return 0;
   }
 
+int POpenAndSearch( const char *cmd, char* subString, char** result )
+  {
+  if( EMPTY( cmd ) || EMPTY( subString ) )
+    return -1;
+
+  int fileDesc = -1;
+  pid_t child = -1;
+  int err = POpenAndRead( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child [%s].", cmd );
+
+  int flags = fcntl( fileDesc, F_GETFL);
+  flags &= ~O_NONBLOCK;
+  fcntl( fileDesc, F_SETFL, flags);
+
+  FILE* f = fdopen( fileDesc, "r" );
+  char buf[BUFLEN];
+  while( fgets( buf, sizeof(buf)-1, f )==buf )
+    {
+    if( strstr( buf, subString )!=NULL )
+      {
+      fclose( f );
+      if( result!=NULL )
+        *result = strdup( buf );
+      return 0;
+      }
+    }
+
+  fclose( f );
+  return -2;
+  }
+
 int POpenAndReadWrite( const char* cmd, int* readFD, int* writeFD, pid_t* child )
   {
   int err = 0;
@@ -3495,3 +3526,18 @@ char* GetWebGroup()
   return strdup( strtok( buf, "\r\n" ) );
   }
 
+int RotateFile( char* path )
+  {
+  char friendlyTime[BUFLEN];
+  (void)DateTimeStr( friendlyTime, sizeof( friendlyTime )-1, 0, time(NULL) );
+  int l = strlen( path ) + strlen( friendlyTime ) + 10;
+  char* newName = (char*)SafeCalloc( l, sizeof(char), "path for file rotation" );
+  strcpy( newName, path );
+  strcat( newName, "-" );
+  strcat( newName, friendlyTime );
+  int err = rename( path, newName );
+  if( err )
+    Warning( "Failed to rename [%s] to [%s] - %d:%d:%s",
+             path, newName, err, errno, strerror( errno ) );
+  return err;
+  }

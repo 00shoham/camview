@@ -140,6 +140,7 @@ _TAG_VALUE* ParseJSON( char* string );
 char* TypeName( enum valueType t );
 
 int POpenAndRead( const char *cmd, int* readPtr, pid_t* childPtr );
+int POpenAndSearch( const char *cmd, char* subString, char** result );
 int POpenAndWrite( const char *cmd, int* writePtr, pid_t* childPtr );
 int POpenAndReadWrite( const char* cmd, int* readFD, int* writeFD, pid_t* child );
 int AsyncReadFromChildProcess( char* cmd,
@@ -173,5 +174,7 @@ char* AggregateMessages( _TAG_VALUE* messages );
 /* apache2 specific: */
 char* GetWebUser();
 char* GetWebGroup();
+
+int RotateFile( char* path );
 
 #endif
