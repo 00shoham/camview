@@ -786,6 +786,8 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
 
+  FREE( tparams );
+
   if( err==0 )
     {
 #ifdef DEBUG
