@@ -37,7 +37,7 @@ void TerminateMonitor( int signo )
 
 void PingCameras( int signo )
   {
-  Notice("Recieved SIGHUP.  Will try to reactivate non-functional cameras.");
+  Notice("SIGHUP or timeout.  Will try to reactivate non-functional cameras.");
   if( glob_conf==NULL )
     return;
   if( glob_conf->cameras==NULL )
@@ -585,6 +585,8 @@ void* ProcessNewImageInThread( void* params )
   char* fileName = tparams->fileName;
   char* prevFile = tparams->prevFile;
 
+  FREE( tparams );
+
   if( config==NULL || cam==NULL || EMPTY( cam->nickName ) || EMPTY( fileName ) )
     {
     FREEIFNOTNULL( fileName );
@@ -773,8 +775,8 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   _NEWIMAGEDATA* tparams = (_NEWIMAGEDATA*)calloc( 1, sizeof(_NEWIMAGEDATA) );
   tparams->config = config;
   tparams->cam = cam;
-  tparams->fileName = SAFESTRDUP(fileName);
-  tparams->prevFile = SAFESTRDUP(prevFile);
+  tparams->fileName = SAFESTRDUP( fileName );
+  tparams->prevFile = SAFESTRDUP( prevFile );
 
   /* QQQ
   int err = pthread_create( &(cam->motionDetectThread),
@@ -785,8 +787,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   */
   (void)ProcessNewImageInThread( (void*)tparams );
   int err = 0;
-
-  FREE( tparams );
 
   if( err==0 )
     {
