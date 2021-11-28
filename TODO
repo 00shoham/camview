@@ -1,8 +1,0 @@
-* Sometimes camview seems to launch duplicate ffmpeg jobs.  Perhaps when
-  one has wedged for a while.  Ensure we kill the old one before starting a
-  new one.
-
-* It seems that it's not a child process.  Perhaps the main process
-  crashes, is restarted, but children of teh old main process remain?
-  Best to check with "ps" command and kill old children.
-
