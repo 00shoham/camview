@@ -3542,3 +3542,38 @@ int RotateFile( char* path )
   FREE( newName );
   return err;
   }
+
+void KillExistingCommandInstances( char* commandLine )
+  {
+  char* commandString = NULL;
+  int nTries = 10;
+  while( POpenAndSearch( "/bin/ps -ef", commandLine, &commandString )==0
+         && nTries-- )
+    {
+    Notice( "Command [%s] already running - will try to stop it", commandLine );
+    if( NOTEMPTY( commandString ) )
+      {
+      char* ptr = NULL;
+      char* userID = strtok_r( commandString, " \t\r\n", &ptr );
+      char* processID = strtok_r( NULL, " \t\r\n", &ptr );
+      int pidNum = -1;
+      if( NOTEMPTY( processID ) )
+        pidNum = atoi( processID );
+
+      Notice( "Killing process %s which belongs to %s", processID, userID );
+      if( pidNum>0 )
+        {
+        int err = kill( (pid_t)pidNum, SIGHUP );
+        if( err )
+          {
+          Warning( "Failed to send HUP signal to process %d: %d:%d:%s",
+                   pidNum, err, errno, strerror( errno ) );
+          break;
+          }
+
+        sleep(1); /* might take a while to stop it */
+        }
+      FREE( commandString );
+      }
+    }
+  }

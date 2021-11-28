@@ -44,6 +44,74 @@ void FreeCamera( _CAMERA* cam )
   FREE( cam );
   }
 
+void CleanCameraFolder( _CAMERA* cam )
+  {
+  /* printf("CleanCameraFolder(%s)\n", cam->nickName);*/
+  if( EMPTY( cam->folderPath ) )
+    {
+    Warning( "Cannot clean files from undefined folder for %s",
+             NULLPROTECT( cam->nickName ) );
+    return;
+    }
+
+  /* remove the jpg files */
+  char** folder = NULL;
+  int nFiles = GetOrderedDirectoryEntries(
+                 cam->folderPath, NULL, ".jpg", &folder, 0 );
+  for( int i=0; i<nFiles; ++i )
+    {
+    if( NOTEMPTY( folder[i] ) )
+      {
+      FileUnlink2( cam->folderPath, folder[i] );
+      }
+    }
+  if( nFiles>0 )
+    {
+    FreeArrayOfStrings( folder, nFiles );
+    }
+
+  /* rename the log files */
+  char *nowName = TimeStampFilename( 0 );
+  if( nowName!=NULL )
+    {
+    if( FileExists2( cam->folderPath, "stderr.log" )==0 )
+      {
+      char newname[BUFLEN];
+      snprintf( newname, sizeof(newname)-1, "%s.stderr.log", nowName );
+      (void)FileRename2( cam->folderPath, "stderr.log", newname );
+      }
+    if( FileExists2( cam->folderPath, "stdout.log" )==0 )
+      {
+      char newname[BUFLEN];
+      snprintf( newname, sizeof(newname)-1, "%s.stdout.log", nowName );
+      (void)FileRename2( cam->folderPath, "stdout.log", newname );
+      }
+    free( nowName );
+    nowName = NULL;
+    }
+  }
+
+void KillCameraProcess( _CAMERA* cam )
+  {
+  /* printf("KillCameraProcess(%s)\n", cam->nickName); */
+  Warning("Stopping process %d on camera %s", cam->childProcess, cam->nickName );
+  if( cam->childProcess )
+    (void)kill( cam->childProcess, SIGHUP );
+
+  cam->childProcess = 0;
+  cam->launchTime = 0;
+  cam->lastImageTime = 0;
+  cam->largestFile = 0;
+  cam->launchAttempts = 0;
+  cam->lastImageCount = 0;
+
+  CleanCameraFolder( cam );
+
+  KillExistingCommandInstances( cam->captureCommand );
+
+  sleep(1);
+  }
+
 _CONFIG* glob_conf=NULL;
 void StopCaptureProcesses()
   {
@@ -58,8 +126,7 @@ void StopCaptureProcesses()
     {
     if( cam->childProcess>0 )
       {
-      (void)kill( cam->childProcess, SIGHUP );
-      cam->childProcess = 0;
+      KillCameraProcess( cam );
       }
     }
   }
@@ -204,53 +271,6 @@ void WritePIDFile( _CAMERA* cam )
   fclose( f );
   }
 
-void CleanCameraFolder( _CAMERA* cam )
-  {
-  /* printf("CleanCameraFolder(%s)\n", cam->nickName);*/
-  if( EMPTY( cam->folderPath ) )
-    {
-    Warning( "Cannot clean files from undefined folder for %s",
-             NULLPROTECT( cam->nickName ) );
-    return;
-    }
-
-  /* remove the jpg files */
-  char** folder = NULL;
-  int nFiles = GetOrderedDirectoryEntries(
-                 cam->folderPath, NULL, ".jpg", &folder, 0 );
-  for( int i=0; i<nFiles; ++i )
-    {
-    if( NOTEMPTY( folder[i] ) )
-      {
-      FileUnlink2( cam->folderPath, folder[i] );
-      }
-    }
-  if( nFiles>0 )
-    {
-    FreeArrayOfStrings( folder, nFiles );
-    }
-
-  /* rename the log files */
-  char *nowName = TimeStampFilename( 0 );
-  if( nowName!=NULL )
-    {
-    if( FileExists2( cam->folderPath, "stderr.log" )==0 )
-      {
-      char newname[BUFLEN];
-      snprintf( newname, sizeof(newname)-1, "%s.stderr.log", nowName );
-      (void)FileRename2( cam->folderPath, "stderr.log", newname );
-      }
-    if( FileExists2( cam->folderPath, "stdout.log" )==0 )
-      {
-      char newname[BUFLEN];
-      snprintf( newname, sizeof(newname)-1, "%s.stdout.log", nowName );
-      (void)FileRename2( cam->folderPath, "stdout.log", newname );
-      }
-    free( nowName );
-    nowName = NULL;
-    }
-  }
-
 pid_t LaunchCapture( _CONFIG* config, _CAMERA* cam )
   {
   /* check config first - is what we're trying sufficiently defined? */
@@ -337,29 +357,7 @@ pid_t LaunchCapture( _CONFIG* config, _CAMERA* cam )
   /* printf("forking %s\n", cam->nickName ); */
   Notice("Forking and running %s", cam->captureCommand );
 
-  char* commandString = NULL;
-  int nTries = 10;
-  while( POpenAndSearch( "/bin/ps -ef", cam->captureCommand, &commandString )==0
-         && nTries-- )
-    {
-    Notice( "Command [%s] already running - will try to stop it", cam->captureCommand );
-    if( NOTEMPTY( commandString ) )
-      {
-      char* ptr = NULL;
-      char* userID = strtok_r( commandString, " \t\r\n", &ptr );
-      char* processID = strtok_r( NULL, " \t\r\n", &ptr );
-      Notice( "Killing process %s which belongs to %s", processID, userID );
-      if( NOTEMPTY( processID ) && atoi( processID )>0 )
-        {
-        char killCmd[BUFLEN];
-        snprintf( killCmd, sizeof(killCmd)-1, "/bin/kill -1 %s", processID );
-        int err = AsyncRunCommandNoIO( killCmd );
-        if( err )
-          Warning( "Failed to launch [%s] - %d:%d:%s", killCmd, err, errno, strerror( errno ) );
-        }
-      FREE( commandString );
-      }
-    }
+  KillExistingCommandInstances( cam->captureCommand );
 
   pid_t child = fork();
 
@@ -462,23 +460,6 @@ int LaunchAllCameras( _CONFIG* config )
     }
 
   return nLaunched;
-  }
-
-void KillCameraProcess( _CAMERA* cam )
-  {
-  /* printf("KillCameraProcess(%s)\n", cam->nickName); */
-  Warning("Stopping process %d on camera %s", cam->childProcess, cam->nickName );
-  (void)kill( cam->childProcess, SIGHUP );
-  cam->childProcess = 0;
-  cam->launchTime = 0;
-  cam->lastImageTime = 0;
-  cam->largestFile = 0;
-  cam->launchAttempts = 0;
-  cam->lastImageCount = 0;
-
-  CleanCameraFolder( cam );
-
-  sleep(1);
   }
 
 void StoreImage( int preLocked,
@@ -997,11 +978,7 @@ int MonitorSingleCamera( _CONFIG* config, _CAMERA* cam )
     Warning( "MonitorSingleCamera() problem.  pid=%d, proc=%d, path=%s",
              cam->childProcess, procExists,
              NULLPROTECT(cam->folderPath) );
-    if( cam->childProcess>0 )
-      {
-      (void)kill( cam->childProcess, SIGHUP );
-      }
-    cam->childProcess = 0;
+    KillCameraProcess( cam );
     }
 
   return 0;

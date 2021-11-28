@@ -176,5 +176,6 @@ char* GetWebUser();
 char* GetWebGroup();
 
 int RotateFile( char* path );
+void KillExistingCommandInstances( char* commandLine );
 
 #endif
