@@ -3545,22 +3545,26 @@ int RotateFile( char* path )
 
 void KillExistingCommandInstances( char* commandLine )
   {
-  char* commandString = NULL;
+  if( EMPTY( commandLine ) )
+    return;
+
+  Notice( "KillExistingCommandInstances( %s )", commandLine );
+  char* procLine = NULL;
   int nTries = 10;
-  while( POpenAndSearch( "/bin/ps -ef", commandLine, &commandString )==0
+  while( POpenAndSearch( "/bin/ps -efww", commandLine, &procLine )==0
          && nTries-- )
     {
     Notice( "Command [%s] already running - will try to stop it", commandLine );
-    if( NOTEMPTY( commandString ) )
+    if( NOTEMPTY( procLine ) )
       {
       char* ptr = NULL;
-      char* userID = strtok_r( commandString, " \t\r\n", &ptr );
+      char* userID = strtok_r( procLine, " \t\r\n", &ptr );
       char* processID = strtok_r( NULL, " \t\r\n", &ptr );
-      int pidNum = -1;
+      long pidNum = -1;
       if( NOTEMPTY( processID ) )
-        pidNum = atoi( processID );
+        pidNum = atol( processID );
 
-      Notice( "Killing process %s which belongs to %s", processID, userID );
+      Notice( "Killing process %ld which belongs to %s", pidNum, userID );
       if( pidNum>0 )
         {
         int err = kill( (pid_t)pidNum, SIGHUP );
@@ -3570,10 +3574,10 @@ void KillExistingCommandInstances( char* commandLine )
                    pidNum, err, errno, strerror( errno ) );
           break;
           }
-
-        sleep(1); /* might take a while to stop it */
+        else
+          sleep(1); /* might take a while to stop it */
         }
-      FREE( commandString );
+      FREE( procLine );
       }
     }
   }
