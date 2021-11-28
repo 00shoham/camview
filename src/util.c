@@ -393,6 +393,53 @@ void TrimTail( char* ptr )
     }
   }
 
+int IsSpace( int c )
+  {
+  if( c==' ' || c=='\t' || c=='\r' || c=='\n' )
+    return 1;
+  return 0;
+  }
+
+void ShiftLeft( char* ptr )
+  {
+  do
+    {
+    *(ptr) = *(ptr+1);
+    ++ptr;
+    } while( *(ptr+1)!=0 );
+  *ptr = 0;
+  }
+
+/* Remove leading and trailing spaces; replace double spaces with single
+   Modifies the original string.
+ */
+char* RemoveExtraSpaces( char* raw )
+  {
+  char* retPtr = raw;
+
+  while( IsSpace( *retPtr ) )
+    ++retPtr;
+
+  int lastWasSpace = 0;
+  for( char* ptr=retPtr; *ptr!=0; ++ptr )
+    {
+    if( lastWasSpace )
+      {
+      while( IsSpace( *ptr ) )
+        ShiftLeft( ptr );
+      lastWasSpace = 0;
+      }
+    else
+      {
+      if( IsSpace( *ptr ) )
+        lastWasSpace = 1;
+      }
+    }
+
+  TrimTail( retPtr );
+  return retPtr;
+  }
+
 int randSeeded = 0;
 
 /* Generate a random identifier of N letters and digits in a provided buffer */

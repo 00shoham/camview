@@ -157,7 +157,7 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       if( config->cameras==NULL )
         Error("%s cannot precede CAMERA in config", variable );
       FreeIfAllocated( &( config->cameras->captureCommand ) );
-      config->cameras->captureCommand = strdup( value );
+      config->cameras->captureCommand = strdup( RemoveExtraSpaces( value ) );
       }
     else if( strcasecmp( variable, "FILES_TO_CACHE" )==0
              && atoi( value ) >0 )
@@ -167,7 +167,7 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
     else if( strcasecmp( variable, "BACKUP_COMMAND" )==0 )
       {
       FreeIfAllocated( &( config->backupCommand ) );
-      config->backupCommand = strdup( value );
+      config->backupCommand = strdup( RemoveExtraSpaces( value ) );
       }
     else if( strcasecmp( variable, "DEFAULT_COLOR_DIFF_THRESHOLD" )==0
              && atoi( value ) >0 )

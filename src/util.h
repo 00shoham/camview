@@ -58,6 +58,7 @@ typedef struct _config _CONFIG;
 char* MakeFullPath( const char* folder, const char* file );
 char* TrimHead( char* ptr );
 void TrimTail( char* ptr );
+char* RemoveExtraSpaces( char* raw );
 int FileExists( const char* path );
 int FileExists2( const char* folder, const char* fileName );
 int FileUnlink2( const char* folder, const char* fileName );
