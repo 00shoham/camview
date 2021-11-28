@@ -176,7 +176,7 @@ char* AggregateMessages( _TAG_VALUE* messages );
 char* GetWebUser();
 char* GetWebGroup();
 
-int RotateFile( char* path );
+int RotateFile( char* path, int keepN );
 void KillExistingCommandInstances( char* commandLine );
 
 #endif

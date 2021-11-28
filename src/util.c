@@ -3573,8 +3573,38 @@ char* GetWebGroup()
   return strdup( strtok( buf, "\r\n" ) );
   }
 
-int RotateFile( char* path )
+int RotateFile( char* path, int keepN )
   {
+  int err = 0;
+
+  /* possibly remove old rotated files first */
+  char folderPart[BUFLEN];
+  char* filePart;
+  folderPart[0] = 0;
+  (void)GetFolderFromPath( path, folderPart, sizeof(folderPart)-1 );
+  filePart = GetFilenameFromPath( path );
+  if( NOTEMPTY( folderPart )
+      && NOTEMPTY( filePart ) )
+    {
+    char prefix[BUFLEN];
+    snprintf( prefix, sizeof(prefix)-1, "%s-", filePart );
+    char** fileNames = NULL;
+    int nFiles = GetOrderedDirectoryEntries( folderPart, prefix, NULL, &fileNames, 1 );
+    if( nFiles > keepN )
+      {
+      for( int i=0; i < (nFiles-keepN); ++i )
+        {
+        char toRemove[BUFLEN*2];
+        snprintf( toRemove, sizeof(toRemove)-1, "%s/%s", folderPart, fileNames[i] );
+        err = unlink( toRemove );
+        if( err )
+          Warning( "Tried to remove [%s] - got %d:%d:%s", err, errno, strerror( errno ) );
+        }
+      }
+    if( nFiles )
+      FreeArrayOfStrings( fileNames, nFiles );
+    }
+
   char friendlyTime[BUFLEN];
   (void)DateTimeStr( friendlyTime, sizeof( friendlyTime )-1, 0, time(NULL) );
   int l = strlen( path ) + strlen( friendlyTime ) + 10;
@@ -3582,7 +3612,7 @@ int RotateFile( char* path )
   strcpy( newName, path );
   strcat( newName, "-" );
   strcat( newName, friendlyTime );
-  int err = rename( path, newName );
+  err = rename( path, newName );
   if( err )
     Warning( "Failed to rename [%s] to [%s] - %d:%d:%s",
              path, newName, err, errno, strerror( errno ) );
@@ -3592,22 +3622,26 @@ int RotateFile( char* path )
 
 void KillExistingCommandInstances( char* commandLine )
   {
-  char* commandString = NULL;
+  if( EMPTY( commandLine ) )
+    return;
+
+  Notice( "KillExistingCommandInstances( %s )", commandLine );
+  char* procLine = NULL;
   int nTries = 10;
-  while( POpenAndSearch( "/bin/ps -ef", commandLine, &commandString )==0
+  while( POpenAndSearch( "/bin/ps -efww", commandLine, &procLine )==0
          && nTries-- )
     {
     Notice( "Command [%s] already running - will try to stop it", commandLine );
-    if( NOTEMPTY( commandString ) )
+    if( NOTEMPTY( procLine ) )
       {
       char* ptr = NULL;
-      char* userID = strtok_r( commandString, " \t\r\n", &ptr );
+      char* userID = strtok_r( procLine, " \t\r\n", &ptr );
       char* processID = strtok_r( NULL, " \t\r\n", &ptr );
-      int pidNum = -1;
+      long pidNum = -1;
       if( NOTEMPTY( processID ) )
-        pidNum = atoi( processID );
+        pidNum = atol( processID );
 
-      Notice( "Killing process %s which belongs to %s", processID, userID );
+      Notice( "Killing process %ld which belongs to %s", pidNum, userID );
       if( pidNum>0 )
         {
         int err = kill( (pid_t)pidNum, SIGHUP );
@@ -3617,10 +3651,10 @@ void KillExistingCommandInstances( char* commandLine )
                    pidNum, err, errno, strerror( errno ) );
           break;
           }
-
-        sleep(1); /* might take a while to stop it */
+        else
+          sleep(1); /* might take a while to stop it */
         }
-      FREE( commandString );
+      FREE( procLine );
       }
     }
   }

@@ -95,8 +95,13 @@ void KillCameraProcess( _CAMERA* cam )
   {
   /* printf("KillCameraProcess(%s)\n", cam->nickName); */
   Warning("Stopping process %d on camera %s", cam->childProcess, cam->nickName );
-  if( cam->childProcess )
+  if( cam->childProcess
+      && ProcessExistsAndIsMine( cam->childProcess ) == 0 )
+    {
     (void)kill( cam->childProcess, SIGHUP );
+    }
+  else
+    Warning("Process %d on camera %s no longer active", cam->childProcess, cam->nickName );
 
   cam->childProcess = 0;
   cam->launchTime = 0;
@@ -105,9 +110,9 @@ void KillCameraProcess( _CAMERA* cam )
   cam->launchAttempts = 0;
   cam->lastImageCount = 0;
 
-  CleanCameraFolder( cam );
-
   KillExistingCommandInstances( cam->captureCommand );
+
+  CleanCameraFolder( cam );
 
   sleep(1);
   }
