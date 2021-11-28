@@ -393,9 +393,11 @@ void TrimTail( char* ptr )
     }
   }
 
-int IsSpace( int c )
+int IsSpace( int c, int noQuotes )
   {
   if( c==' ' || c=='\t' || c=='\r' || c=='\n' )
+    return 1;
+  if( noQuotes && c=='"' )
     return 1;
   return 0;
   }
@@ -413,11 +415,11 @@ void ShiftLeft( char* ptr )
 /* Remove leading and trailing spaces; replace double spaces with single
    Modifies the original string.
  */
-char* RemoveExtraSpaces( char* raw )
+char* RemoveExtraSpaces( char* raw, int noQuotes )
   {
   char* retPtr = raw;
 
-  while( IsSpace( *retPtr ) )
+  while( IsSpace( *retPtr, noQuotes ) )
     ++retPtr;
 
   int lastWasSpace = 0;
@@ -425,18 +427,25 @@ char* RemoveExtraSpaces( char* raw )
     {
     if( lastWasSpace )
       {
-      while( IsSpace( *ptr ) )
+      while( IsSpace( *ptr, noQuotes ) )
         ShiftLeft( ptr );
       lastWasSpace = 0;
       }
     else
       {
-      if( IsSpace( *ptr ) )
+      if( IsSpace( *ptr, noQuotes ) )
         lastWasSpace = 1;
       }
     }
 
-  TrimTail( retPtr );
+  for( char* eolc = retPtr+strlen(retPtr)-1; eolc>=retPtr; --eolc )
+    {
+    if( IsSpace( *eolc, noQuotes ) )
+      *eolc = 0;
+    else
+      break;
+    }
+
   return retPtr;
   }
 
