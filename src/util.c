@@ -3526,8 +3526,38 @@ char* GetWebGroup()
   return strdup( strtok( buf, "\r\n" ) );
   }
 
-int RotateFile( char* path )
+int RotateFile( char* path, int keepN )
   {
+  int err = 0;
+
+  /* possibly remove old rotated files first */
+  char folderPart[BUFLEN];
+  char* filePart;
+  folderPart[0] = 0;
+  (void)GetFolderFromPath( path, folderPart, sizeof(folderPart)-1 );
+  filePart = GetFilenameFromPath( path );
+  if( NOTEMPTY( folderPart )
+      && NOTEMPTY( filePart ) )
+    {
+    char prefix[BUFLEN];
+    snprintf( prefix, sizeof(prefix)-1, "%s-", filePart );
+    char** fileNames = NULL;
+    int nFiles = GetOrderedDirectoryEntries( folderPart, prefix, NULL, &fileNames, 1 );
+    if( nFiles > keepN )
+      {
+      for( int i=0; i < (nFiles-keepN); ++i )
+        {
+        char toRemove[BUFLEN*2];
+        snprintf( toRemove, sizeof(toRemove)-1, "%s/%s", folderPart, fileNames[i] );
+        err = unlink( toRemove );
+        if( err )
+          Warning( "Tried to remove [%s] - got %d:%d:%s", err, errno, strerror( errno ) );
+        }
+      }
+    if( nFiles )
+      FreeArrayOfStrings( fileNames, nFiles );
+    }
+
   char friendlyTime[BUFLEN];
   (void)DateTimeStr( friendlyTime, sizeof( friendlyTime )-1, 0, time(NULL) );
   int l = strlen( path ) + strlen( friendlyTime ) + 10;
@@ -3535,7 +3565,7 @@ int RotateFile( char* path )
   strcpy( newName, path );
   strcat( newName, "-" );
   strcat( newName, friendlyTime );
-  int err = rename( path, newName );
+  err = rename( path, newName );
   if( err )
     Warning( "Failed to rename [%s] to [%s] - %d:%d:%s",
              path, newName, err, errno, strerror( errno ) );

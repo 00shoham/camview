@@ -60,7 +60,7 @@ int main( int argc, char** argv )
       && NOTEMPTY( config->logFile )
       && FileExists( config->logFile )==0 )
     {
-    if( RotateFile( config->logFile )!=0 )
+    if( RotateFile( config->logFile, LOG_FILES_TO_KEEP )!=0 )
       {
       Warning( "Failed to rotate-out old log file %s", config->logFile );
       int err = unlink( config->logFile );

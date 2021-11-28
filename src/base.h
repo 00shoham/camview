@@ -28,6 +28,8 @@
 #include <pthread.h>
 #include <execinfo.h>
 
+#define LOG_FILES_TO_KEEP 10
+
 #define INVALID_INT -999999
 #define INVALID_DOUBLE -99999.0
 
