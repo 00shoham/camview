@@ -28,7 +28,6 @@ typedef struct _camera
   _IMAGE* recentImage;
   int haveMotionDetectThread;
   pthread_t motionDetectThread;
-  _NEWIMAGEDATA* threadParams;
   int debug;
 
   /* brighten the image first, if it's too dark */

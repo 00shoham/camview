@@ -655,7 +655,7 @@ void* ProcessNewImageInThread( void* params )
 
   /* remember what file we were working on, to avoid dups (as above) */
   FreeIfAllocated( &(cam->lastImageSourceName) );
-  cam->lastImageSourceName = strdup( fileName );
+  cam->lastImageSourceName = SAFESTRDUP( fileName );
   cam->lastImageCount = 0;
 
   int size = (int)FileSize2( cam->folderPath, fileName );
@@ -789,12 +789,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   if( cam->haveMotionDetectThread )
     {
     pthread_join( cam->motionDetectThread, NULL );
-    if( cam->threadParams!=NULL )
-      {
-      FREEIFNOTNULL( cam->threadParams->fileName );
-      FREEIFNOTNULL( cam->threadParams->prevFile );
-      }
-    FREEIFNOTNULL( cam->threadParams );
     cam->haveMotionDetectThread = 0;
     }
 
@@ -824,12 +818,6 @@ void ProcessNewImage( _CONFIG* config, _CAMERA* cam,
   else
     {
     Warning( "Failed to create worker thread - %d", err );
-    if( cam->threadParams!=NULL )
-      {
-      FREEIFNOTNULL( cam->threadParams->fileName );
-      FREEIFNOTNULL( cam->threadParams->prevFile );
-      }
-    FREEIFNOTNULL( cam->threadParams );
     }
   }
 
