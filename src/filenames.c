@@ -5,11 +5,8 @@ _FILENAME* NewFilename( char* name, _FILENAME* list )
   if( EMPTY( name ) )
     return list;
 
-  _FILENAME* f = (_FILENAME*)calloc( 1, sizeof( _FILENAME ) );
-  if( f==NULL )
-    return list;
-
-  f->name = strdup( name );
+  _FILENAME* f = (_FILENAME*)SafeCalloc( 1, sizeof( _FILENAME ), "_FILENAME" );
+  f->name = SAFESTRDUP( name );
   f->next = list;
   return f;
   }
