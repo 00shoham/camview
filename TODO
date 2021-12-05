@@ -1,3 +1,0 @@
-Sometimes camview seems to launch duplicate ffmpeg jobs.  Perhaps when
-one has wedged for a while.  Ensure we kill the old one before starting a
-new one.

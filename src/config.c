@@ -28,54 +28,13 @@ void SetDefaults( _CONFIG* config )
   config->hup_interval = DEFAULT_HUP_INTERVAL;
   }
 
-void SetDefaultsSingleCamera( _CONFIG* config, _CAMERA* cam )
-  {
-  cam->minimumIntervalSeconds = config->minimumIntervalSeconds;
-  cam->storePreMotion = config->storePreMotion;
-  cam->motionFrames = config->motionFrames;
-  cam->color_diff_threshold = config->color_diff_threshold;
-  cam->color_dark = config->color_dark;
-  cam->dark_brightness_boost = config->dark_brightness_boost;
-  cam->despeckle_dark_threshold = config->despeckle_dark_threshold;
-  cam->despeckle_nondark_min = config->despeckle_nondark_min;
-  cam->despeckle_bright_threshold = config->despeckle_bright_threshold;
-  cam->despeckle_nonbright_max = config->despeckle_nonbright_max;
-  cam->checkerboard_square_size = config->checkerboard_square_size;
-  cam->checkerboard_min_white = config->checkerboard_min_white;
-  cam->checkerboard_num_white = config->checkerboard_num_white;
-  cam->checkerboard_percent = config->checkerboard_percent;
-  if( pthread_mutex_init( &(cam->lock), NULL )!=0 )
-    {
-    Error( "Failed to init a mutex for camera %s", NULLPROTECT( cam->nickName ) );
-    }
-  }
-
-void FreeCamera( _CAMERA* cam )
-  {
-  if( cam==NULL )
-    return;
-
-  FreeImage( &(cam->recentImage) );
-  FreeIfAllocated( &(cam->nickName) );
-  FreeIfAllocated( &(cam->ipAddress) );
-  FreeIfAllocated( &(cam->captureCommand) );
-  FreeIfAllocated( &(cam->folderPath) );
-  FreeIfAllocated( &(cam->backupFolderPath) );
-  FreeIfAllocated( &(cam->lastStoredImage) );
-  FreeIfAllocated( &(cam->lastImageSourceName) );
-
-  (void)pthread_mutex_destroy( &(cam->lock) );
-
-  FREE( cam );
-  }
-
 void FreeConfig( _CONFIG* config )
   {
   _CAMERA* cam = config->cameras;
   while( cam!=NULL )
     {
     _CAMERA* nextCam = cam->next;
-    if( nextCam!=NULL )
+    if( cam!=NULL )
       {
       FreeCamera( cam );
       --(config->nCameras);
@@ -99,9 +58,11 @@ void FreeConfig( _CONFIG* config )
 
   FreeIfAllocated( &(config->baseDir) );
   FreeIfAllocated( &(config->backupDir) );
+  FreeIfAllocated( &(config->backupCommand) );
   FreeIfAllocated( &(config->downloadDir) );
   FreeIfAllocated( &(config->logFile) );
   FreeIfAllocated( &(config->cgiLogFile) );
+  FreeIfAllocated( &(config->configName) );
 
   if( config->logFileHandle!=NULL )
     {
@@ -146,8 +107,10 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
   char* variable = TrimHead( ptr );
   TrimTail( variable );
   char* value = TrimHead( equalsChar+1 );
-  char* originalValue = value;
   TrimTail( value );
+
+  /* indicates that we used strdup() to recompute the value ptr */
+  int allocatedValue = 0;
 
   if( NOTEMPTY( variable ) && NOTEMPTY( value ) )
     {
@@ -159,15 +122,13 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       int loopMax = 10;
       while( loopMax>0 )
         {
-        int n = ExpandMacros( value, valueBuf, sizeof( valueBuf ), config->list );
+        int n = ExpandMacros( value, valueBuf, sizeof( valueBuf )-2, config->list );
         if( n>0 )
           {
-          /* don't free the original value - that's done elsewhere */
-          if( value!=NULL && value!=originalValue )
-            {
-            free( value );
-            }
+          if( allocatedValue )
+            FREE( value );
           value = strdup( valueBuf );
+          allocatedValue = 1;
           }
         else
           {
@@ -196,7 +157,7 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       if( config->cameras==NULL )
         Error("%s cannot precede CAMERA in config", variable );
       FreeIfAllocated( &( config->cameras->captureCommand ) );
-      config->cameras->captureCommand = strdup( value );
+      config->cameras->captureCommand = strdup( RemoveExtraSpaces( value, 1 ) );
       }
     else if( strcasecmp( variable, "FILES_TO_CACHE" )==0
              && atoi( value ) >0 )
@@ -206,7 +167,7 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
     else if( strcasecmp( variable, "BACKUP_COMMAND" )==0 )
       {
       FreeIfAllocated( &( config->backupCommand ) );
-      config->backupCommand = strdup( value );
+      config->backupCommand = strdup( RemoveExtraSpaces( value, 0 ) );
       }
     else if( strcasecmp( variable, "DEFAULT_COLOR_DIFF_THRESHOLD" )==0
              && atoi( value ) >0 )
@@ -447,6 +408,9 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       */
       }
     }
+
+  if( allocatedValue )
+    FREE( value );
   }
 
 void PrintConfig( FILE* f, _CONFIG* config )

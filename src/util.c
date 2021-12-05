@@ -1,4 +1,5 @@
 #include "base.h"
+#include <uuid/uuid.h>
 
 char generatedIdentifierChars[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 char validIdentifierChars[] = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_";
@@ -61,7 +62,6 @@ int FileUnlink2( const char* folder, const char* fileName )
   {
   char* fullPath = MakeFullPath( folder, fileName );
   int err = unlink( fullPath );
-  if( err ) Warning( "Tried to unlink %s - error %d (%d:%s)", fullPath, err, errno, strerror(errno) );
   FREEIFNOTNULL( fullPath );
   return err;
   }
@@ -180,8 +180,8 @@ int GetOrderedDirectoryEntries( const char* path,
   while( (de=readdir( d ))!=NULL )
     {
     if( NOTEMPTY( de->d_name )
-        && ( EMPTY( suffix ) || StringEndsWith( de->d_name, suffix, 0 )==0 )
-        && ( EMPTY( prefix ) || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
+        && ( suffix==NULL || StringEndsWith( de->d_name, suffix, 0 )==0 )
+        && ( prefix==NULL || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
       {
       ++nEntries;
       }
@@ -202,8 +202,8 @@ int GetOrderedDirectoryEntries( const char* path,
   while( (de=readdir( d ))!=NULL && n<nEntries )
     {
     if( NOTEMPTY( de->d_name )
-        && ( EMPTY( suffix ) || StringEndsWith( de->d_name, suffix, 0 )==0 )
-        && ( EMPTY( prefix ) || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
+        && ( suffix==NULL || StringEndsWith( de->d_name, suffix, 0 )==0 )
+        && ( prefix==NULL || StringStartsWith( de->d_name, prefix, 0 )==0 ) )
       {
       entries[ n ] = strdup( de->d_name );
       ++n;
@@ -391,6 +391,62 @@ void TrimTail( char* ptr )
       break;
       }
     }
+  }
+
+int IsSpace( int c, int noQuotes )
+  {
+  if( c==' ' || c=='\t' || c=='\r' || c=='\n' )
+    return 1;
+  if( noQuotes && c=='"' )
+    return 1;
+  return 0;
+  }
+
+void ShiftLeft( char* ptr )
+  {
+  do
+    {
+    *(ptr) = *(ptr+1);
+    ++ptr;
+    } while( *(ptr+1)!=0 );
+  *ptr = 0;
+  }
+
+/* Remove leading and trailing spaces; replace double spaces with single
+   Modifies the original string.
+ */
+char* RemoveExtraSpaces( char* raw, int noQuotes )
+  {
+  char* retPtr = raw;
+
+  while( IsSpace( *retPtr, noQuotes ) )
+    ++retPtr;
+
+  int lastWasSpace = 0;
+  for( char* ptr=retPtr; *ptr!=0; ++ptr )
+    {
+    if( lastWasSpace )
+      {
+      while( IsSpace( *ptr, noQuotes ) )
+        ShiftLeft( ptr );
+      lastWasSpace = 0;
+      }
+    else
+      {
+      if( IsSpace( *ptr, noQuotes ) )
+        lastWasSpace = 1;
+      }
+    }
+
+  for( char* eolc = retPtr+strlen(retPtr)-1; eolc>=retPtr; --eolc )
+    {
+    if( IsSpace( *eolc, noQuotes ) )
+      *eolc = 0;
+    else
+      break;
+    }
+
+  return retPtr;
   }
 
 int randSeeded = 0;
@@ -635,7 +691,7 @@ int StringEndsWith( const char* string, const char* suffix, int caseSensitive )
     return -2;
     }
 
-  if( caseSensitive==0 )
+  if( caseSensitive )
     {
     return strcasecmp( string + ls - lu, suffix );
     }
@@ -658,7 +714,7 @@ int StringStartsWith( const char* string, const char* prefix, int caseSensitive 
     return -2;
     }
 
-  if( caseSensitive==0 )
+  if( caseSensitive )
     {
     return strncasecmp( string, prefix, strlen(prefix) );
     }
@@ -737,7 +793,9 @@ _TAG_VALUE* NewTagValue( char* tag, char* value, _TAG_VALUE* list, int replaceDu
       if( NOTEMPTY( t->tag ) && strcmp( t->tag,tag )==0 )
         {
         FreeIfAllocated( &(t->value) );
-        t->value = strdup( value );
+        if( value==NULL ) t->value = NULL;
+        else t->value = strdup( value );
+        t->type = VT_STR;
         return list;
         }
       }
@@ -745,9 +803,175 @@ _TAG_VALUE* NewTagValue( char* tag, char* value, _TAG_VALUE* list, int replaceDu
 
   /* nope - it's new.  create a new item in the list */
   _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
-  n->tag = strdup( tag );
-  n->value = strdup( value );
+  if( tag==NULL )
+    n->tag = NULL;
+  else
+    n->tag = strdup( tag );
+
+  n->type = VT_STR;
+  if( value==NULL ) n->value = NULL;
+  else n->value = strdup( value );
   n->subHeaders = NULL;
+  n->next = list;
+  return n;
+  }
+
+int AllDigits( char* str )
+  {
+  while( *str!=0 )
+    {
+    int c = *str;
+    if( ! isdigit( c ) )
+      return 0;
+    ++str;
+    }
+
+  return 1;
+  }
+
+int AllDigitsSingleDot( char* str )
+  {
+  int nDots = 0;
+  while( (*str)!=0 )
+    {
+    int c = *str;
+    if( ! isdigit( c ) )
+      {
+      if( c == '.' )
+        {
+        ++nDots;
+        }
+      else
+        {
+        return 0;
+        }
+
+      if( nDots>1 )
+        {
+        return 0;
+        }
+      }
+
+    ++str;
+    }
+
+  if( nDots==1 )
+    {
+    return 1;
+    }
+
+  return 0;
+  }
+
+enum valueType GuessType( char* str )
+  {
+  if( EMPTY( str ) )
+    return VT_INVALID;
+
+  if( AllDigits( str ) )
+    return VT_INT;
+
+  if( AllDigitsSingleDot( str ) )
+    return VT_DOUBLE;
+
+  return VT_STR;
+  }
+
+_TAG_VALUE* NewTagValueGuessType( char* tag, char* value, _TAG_VALUE* list, int replaceDup )
+  {
+  if( replaceDup )
+    {
+    /* do we already have this tag?  if so, replace the value */
+    for( _TAG_VALUE* t=list; t!=NULL; t=t->next )
+      {
+      if( ( NOTEMPTY( t->tag ) && NOTEMPTY( tag ) && strcmp( t->tag,tag )==0 )
+          || ( EMPTY( t->tag ) && EMPTY( tag ) ) )
+        {
+        FreeIfAllocated( &(t->value) );
+        t->type = GuessType( value );
+        switch( t->type )
+          {
+          case VT_INVALID:
+            break;
+          case VT_STR:
+            t->value = strdup( value );
+            break;
+          case VT_INT:
+            t->iValue = atoi( value );
+            break;
+          case VT_DOUBLE:
+            t->dValue = atof( value );
+            break;
+          case VT_LIST:
+            Error( "We do not guess the type of a list value in TV" );
+            break;
+          case VT_NULL:
+            /* not a thing */
+            break;
+          }
+        return list;
+        }
+      }
+    }
+
+  /* nope - it's new.  create a new item in the list */
+  _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
+  if( EMPTY( tag ) )
+    n->tag = NULL;
+  else
+    n->tag = strdup( tag );
+  n->type = GuessType( value );
+  switch( n->type )
+    {
+    case VT_INVALID:
+      break;
+    case VT_STR:
+      n->value = strdup( value );
+      break;
+    case VT_INT:
+      n->iValue = atoi( value );
+      break;
+    case VT_DOUBLE:
+      n->dValue = atof( value );
+      break;
+    case VT_LIST:
+      Error( "TV type guessing does not return LIST" );
+      break;
+    case VT_NULL:
+      /* not a thing */
+      break;
+    }
+
+  n->next = list;
+  return n;
+  }
+
+_TAG_VALUE* NewTagValueNull( char* tag, _TAG_VALUE* list, int replaceDup )
+  {
+  if( replaceDup )
+    {
+    /* do we already have this tag?  if so, replace the value */
+    for( _TAG_VALUE* t=list; t!=NULL; t=t->next )
+      {
+      if( ( NOTEMPTY( t->tag ) && NOTEMPTY( tag ) && strcmp( t->tag,tag )==0 )
+          || ( EMPTY( t->tag ) && EMPTY( tag ) ) )
+        {
+        FreeIfAllocated( &(t->value) );
+        t->type = VT_NULL;
+        t->value = NULL;
+        return list;
+        }
+      }
+    }
+
+  /* nope - it's new.  create a new item in the list */
+  _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
+  if( EMPTY( tag ) )
+    n->tag = NULL;
+  else
+    n->tag = strdup( tag );
+  n->type = VT_NULL;
+
   n->next = list;
   return n;
   }
@@ -762,6 +986,7 @@ _TAG_VALUE* NewTagValueInt( char* tag, int value, _TAG_VALUE* list, int replaceD
       if( NOTEMPTY( t->tag ) && strcmp( t->tag,tag )==0 )
         {
         t->iValue = value;
+        t->type = VT_INT;
         return list;
         }
       }
@@ -771,6 +996,33 @@ _TAG_VALUE* NewTagValueInt( char* tag, int value, _TAG_VALUE* list, int replaceD
   _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
   n->tag = strdup( tag );
   n->iValue = value;
+  n->type = VT_INT;
+  n->subHeaders = NULL;
+  n->next = list;
+  return n;
+  }
+
+_TAG_VALUE* NewTagValueDouble( char* tag, double value, _TAG_VALUE* list, int replaceDup )
+  {
+  if( replaceDup )
+    {
+    /* do we already have this tag?  if so, replace the value */
+    for( _TAG_VALUE* t=list; t!=NULL; t=t->next )
+      {
+      if( NOTEMPTY( t->tag ) && strcmp( t->tag,tag )==0 )
+        {
+        t->dValue = value;
+        t->type = VT_DOUBLE;
+        return list;
+        }
+      }
+    }
+
+  /* nope - it's new.  create a new item in the list */
+  _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
+  n->tag = strdup( tag );
+  n->dValue = value;
+  n->type = VT_DOUBLE;
   n->subHeaders = NULL;
   n->next = list;
   return n;
@@ -790,6 +1042,7 @@ _TAG_VALUE* NewTagValueList( char* tag, _TAG_VALUE* value, _TAG_VALUE* list, int
           FreeTagValue( t->subHeaders );
           }
         t->subHeaders = value;
+        t->type = VT_LIST;
         return list;
         }
       }
@@ -797,10 +1050,45 @@ _TAG_VALUE* NewTagValueList( char* tag, _TAG_VALUE* value, _TAG_VALUE* list, int
 
   /* nope - it's new.  create a new item in the list */
   _TAG_VALUE* n = (_TAG_VALUE*)SafeCalloc(1, sizeof( _TAG_VALUE ), "_TAG_VALUE" );
-  n->tag = strdup( tag );
+  if( EMPTY( tag ) )
+    n->tag = NULL;
+  else
+    n->tag = strdup( tag );
   n->subHeaders = value;
+  n->type = VT_LIST;
   n->next = list;
   return n;
+  }
+
+_TAG_VALUE* DeleteTagValue( _TAG_VALUE* list, char* tag )
+  {
+  if( EMPTY( tag ) || list==NULL )
+    return list;
+
+  _TAG_VALUE** ptr = &list;
+  while( ptr!=NULL && (*ptr)!=NULL )
+    {
+    _TAG_VALUE* current = *ptr;
+    if( current!=NULL
+        && NOTEMPTY( current->tag )
+        && strcmp( current->tag, tag )==0 )
+      {
+      *ptr = current->next;
+      FreeIfAllocated( &(current->tag) );
+      FreeIfAllocated( &(current->value) );
+      FreeTagValue( current->subHeaders );
+      FREE( current );
+      /* keep going as there may be other tag/value pairs with the same tag */
+      }
+    else
+      {
+      if( current==NULL )
+        break;
+      ptr = & (current->next);
+      }
+    }
+
+  return list;
   }
 
 char* GetTagValue( _TAG_VALUE* list, char* tagName )
@@ -813,14 +1101,291 @@ char* GetTagValue( _TAG_VALUE* list, char* tagName )
 
   while( list!=NULL )
     {
-    if( list->tag!=NULL && *list->tag!=0 && strcmp(list->tag,tagName)==0 )
+    if( NOTEMPTY( list->tag)
+        && strcasecmp(list->tag,tagName)==0
+        && list->type==VT_STR )
       {
       retVal = list->value;
+      break;
       }
     list = list->next;
     }
 
   return retVal;
+  }
+
+_TAG_VALUE* FindTagValue( _TAG_VALUE* list, char* tagName )
+  {
+  _TAG_VALUE* retVal = NULL;
+  if( EMPTY( tagName ) )
+    {
+    return NULL;
+    }
+
+  while( list!=NULL )
+    {
+    if( NOTEMPTY( list->tag)
+        && strcmp(list->tag,tagName)==0 )
+      {
+      retVal = list;
+      break;
+      }
+    list = list->next;
+    }
+
+  return retVal;
+  }
+
+int GetTagValueInt( _TAG_VALUE* list, char* tagName )
+  {
+  int retVal = INVALID_INT;
+  if( EMPTY( tagName ) )
+    {
+    return retVal;
+    }
+
+  while( list!=NULL )
+    {
+    if( NOTEMPTY( list->tag )
+        && strcasecmp(list->tag,tagName)==0
+        && list->type==VT_INT )
+      {
+      retVal = list->iValue;
+      break;
+      }
+    list = list->next;
+    }
+
+  return retVal;
+  }
+
+double GetTagValueDouble( _TAG_VALUE* list, char* tagName )
+  {
+  double retVal = INVALID_DOUBLE;
+  if( EMPTY( tagName ) )
+    {
+    return retVal;
+    }
+
+  while( list!=NULL )
+    {
+    if( NOTEMPTY( list->tag )
+        && strcasecmp(list->tag,tagName)==0 )
+      {
+      if( list->type==VT_DOUBLE )
+        {
+        retVal = list->dValue;
+        break;
+        }
+      else if( list->type==VT_INT )
+        {
+        retVal = (double)list->iValue;
+        break;
+        }
+      }
+    list = list->next;
+    }
+
+  return retVal;
+  }
+
+_TAG_VALUE* GetTagValueList( _TAG_VALUE* list, char* tagName )
+  {
+  if( EMPTY( tagName ) || list==NULL )
+    return NULL;
+
+  _TAG_VALUE* retVal = NULL;
+  for( ; list!=NULL; list=list->next )
+    {
+    if( NOTEMPTY( list->tag )
+        && strcasecmp( list->tag, tagName )==0 )
+      {
+      retVal = list->subHeaders;
+      break;
+      }
+    }
+
+  return retVal;
+  }
+
+int CompareTagValueList( _TAG_VALUE* a, _TAG_VALUE* b )
+  {
+  if( a==b )
+    return 0;
+
+  if( a!=NULL && b==NULL )
+    return -1;
+
+  if( a==NULL && b!=NULL )
+    return -2;
+
+  for( _TAG_VALUE* tv=a; tv!=NULL; tv=tv->next )
+    {
+    if( EMPTY( tv->tag ) )
+      continue;
+
+    switch( tv->type )
+      {
+      case VT_LIST:
+        {
+        _TAG_VALUE* cmp = GetTagValueList( b, tv->tag );
+        if( cmp==NULL )
+          return -100;
+        int err = CompareTagValueList( tv->subHeaders, cmp );
+        if( err!=0 )
+          return -100 + err;
+        }
+        break;
+
+      case VT_INVALID:
+        if( tv->subHeaders!=NULL )
+          {}
+        else
+          Warning( "Comparing tags - [%s] has invalid type", NULLPROTECT( tv->tag ) );
+        break;
+
+      case VT_STR:
+        if( EMPTY( tv->value ) )
+          {
+          printf( "%s has empty string\n", NULLPROTECT( tv->tag ) );
+          return -3;
+          }
+
+        char* str = GetTagValue( b, tv->tag );
+        if( EMPTY( str ) )
+          return -4;
+
+        int c = strcmp( tv->value, str );
+        if( c )
+          return -5;
+        break;
+
+      case VT_INT:
+        {
+        int i = GetTagValueInt( b, tv->tag );
+        if( i!=tv->iValue )
+          return -6;
+        }
+        break;
+
+      case VT_DOUBLE:
+        {
+        double d = GetTagValueDouble( b, tv->tag );
+        if( d!=tv->dValue )
+          return -7;
+        }
+        break;
+
+      case VT_NULL:
+        {
+        _TAG_VALUE* sub = FindTagValue( b, tv->tag );
+        if( sub==NULL || sub->type!=VT_NULL )
+          return -8;
+        }
+        break;
+      }
+
+    if( tv->type != VT_LIST
+        && tv->subHeaders!=NULL )
+      { /* not really a list but there are sub-headers anyways? */
+      _TAG_VALUE* sub = GetTagValueList( b, tv->tag );
+      if( sub==NULL )
+        return -200;
+      int err = CompareTagValueList( tv->subHeaders, sub );
+      if( err!=0 )
+        return -200 + err;
+      }
+
+    }
+
+  return 0;
+  }
+
+int CompareTagValueListBidirectional( _TAG_VALUE* a, _TAG_VALUE* b )
+  {
+  int c1 = CompareTagValueList( a, b );
+  int c2 = CompareTagValueList( b, a );
+  return c1 | c2;
+  }
+
+void PrintTagValue( int indent, _TAG_VALUE* list )
+  {
+  if( indent<0 || indent>100 )
+    return;
+  if( list==NULL )
+    return;
+
+  char indentBuf[200];
+  memset( indentBuf, ' ', indent );
+  indentBuf[indent] = 0;
+
+  char printLine[BUFLEN];
+  char* ptr = printLine;
+  char* end = printLine + sizeof(printLine) - 1;
+
+  strncpy( ptr, indentBuf, end-ptr );
+    ptr += strlen( ptr );
+  if( list->tag!=NULL )
+    {
+    strncpy( ptr, "\"", end-ptr );
+      ptr += strlen( ptr );
+    strncpy( ptr, NULLPROTECT( list->tag ), end-ptr );
+      ptr += strlen( ptr );
+    strncpy( ptr, "\"", end-ptr );
+      ptr += strlen( ptr );
+    strncpy( ptr, ": ", end-ptr );
+      ptr += strlen( ptr );
+    }
+  switch( list->type )
+    {
+    case VT_INVALID:
+      if( list->subHeaders!=NULL )
+        {}
+      else
+        Warning( "Printing tags - [%s] has invalid type", NULLPROTECT( list->tag ) );
+      break;
+    case VT_LIST:
+      if( list->subHeaders==NULL )
+        {
+        strncpy( ptr, "[]", end-ptr );
+          ptr += strlen( ptr );
+        }
+      break;
+    case VT_NULL:
+      strncpy( ptr, "null", end-ptr );
+      ptr += strlen( ptr );
+      break;
+    case VT_STR:
+      if( list->value!=NULL )
+        {
+        strncpy( ptr, "\"", end-ptr );
+          ptr += strlen( ptr );
+        strncpy( ptr, list->value, end-ptr );
+          ptr += strlen( ptr );
+        strncpy( ptr, "\"", end-ptr );
+          ptr += strlen( ptr );
+        }
+      break;
+    case VT_INT:
+      snprintf( ptr, (int)(end-ptr), "(int) %d", list->iValue );
+      break;
+    case VT_DOUBLE:
+      snprintf( ptr, (int)(end-ptr), "(double) %lf", list->dValue );
+      break;
+    }
+  /*
+  strncpy( ptr,end-ptr, "\n" );
+    ptr += strlen( ptr );
+  */
+  Notice( printLine );
+  if( list->subHeaders!=NULL )
+    {
+    PrintTagValue( indent+2, list->subHeaders );
+    }
+  if( list->next!=NULL )
+    {
+    PrintTagValue( indent, list->next );
+    }
   }
 
 char* GetTagValueSafe( _TAG_VALUE* list, char* tagName, char* expr )
@@ -840,6 +1405,44 @@ char* GetTagValueSafe( _TAG_VALUE* list, char* tagName, char* expr )
 
   /* no match - return empty string as original is dangerous */
   return NULL;
+  }
+
+_TAG_VALUE* CopyTagValueList( _TAG_VALUE* list )
+  {
+  if( list==NULL )
+    return NULL;
+
+  _TAG_VALUE* newList = NULL;
+  for( ; list!=NULL; list=list->next )
+    {
+    switch( list->type )
+      {
+      case VT_INVALID:
+        Error( "Cannot copy a _TAG_VALUE list with an invalid-type entry" );
+
+      case VT_STR:
+        newList = NewTagValue( list->tag, list->value, newList, 0 );
+        break;
+
+      case VT_INT:
+        newList = NewTagValueInt( list->tag, list->iValue, newList, 0 );
+        break;
+
+      case VT_DOUBLE:
+        newList = NewTagValueDouble( list->tag, list->dValue, newList, 0 );
+        break;
+
+      case VT_LIST:
+        newList = NewTagValueList( list->tag, CopyTagValueList( list->subHeaders ), newList, 0 );
+        break;
+
+      case VT_NULL:
+        newList = NewTagValueNull( list->tag, newList, 0 );
+        break;
+      }
+    }
+
+  return newList;
   }
 
 /* FreeTagValue()
@@ -865,27 +1468,12 @@ void FreeTagValue( _TAG_VALUE* list )
   if( list->tag!=NULL )
     {
     FREE( list->tag );
-    list->tag = NULL;
     }
   if( list->value!=NULL )
     {
     FREE( list->value );
-    list->value = NULL;
     }
   FREE( list );
-  }
-
-/* PrintTagValue()
- * Used for debugging - see what's in the linked-list struct.
- */
-void PrintTagValue( char* prefix, _TAG_VALUE* list )
-  {
-  for( int i=0; list!=NULL; list=list->next, ++i )
-    {
-    printf( "%s  %02d. tag=%s, value=%s\n",
-            prefix, i, NULLPROTECT( list->tag ), NULLPROTECT( list->value) );
-    PrintTagValue( "  ", list->subHeaders );
-    }
   }
 
 /* ExpandMacros
@@ -1072,12 +1660,38 @@ int ExpandMacrosVA( char* src, char* dst, int dstLen, ... )
   return n;
   }
 
+_TAG_VALUE* TagIntList( char* placeHolderPtr, ... )
+  {
+  _TAG_VALUE* list = NULL;
+
+  va_list argptr;
+  va_start( argptr, placeHolderPtr );
+  for(;;)
+    {
+    char* tag = NULL;
+
+    tag = va_arg( argptr, char* );
+    if( tag==NULL )
+      {
+      break;
+      }
+
+    int value = va_arg( argptr, int );
+    list = NewTagValueInt( tag, value, list, 1 );
+    }
+
+  va_end( argptr );
+
+  return list;
+  }
+
 void LowerCase( char* dst, int dstSize, char* src )
   {
   if( dst==NULL )
     return;
 
-  *dst = 0;
+  if( dst!=src )
+    *dst = 0;
 
   if( EMPTY( src ) )
     return;
@@ -1366,7 +1980,7 @@ int IPinSubnet( IPADDR* ip, IPADDR* subnet )
   return 0;
   }
 
-char* Encode( int nBytes, char* bytes )
+char* Encode( int nBytes, unsigned char* bytes )
   {
   if( nBytes<1 || nBytes>MAX_ENCODE || bytes==NULL )
     {
@@ -1387,7 +2001,7 @@ char* Encode( int nBytes, char* bytes )
   return buf;
   }
 
-char* Decode( char* string )
+unsigned char* Decode( char* string )
   {
   if( EMPTY( string ) )
     {
@@ -1395,8 +2009,8 @@ char* Decode( char* string )
     }
 
   int n = strlen( string );
-  char* buf = (char*)calloc( n/2+1, sizeof(char*) );
-  char* dst = buf;
+  unsigned char* buf = (unsigned char*)calloc( n/2+1, sizeof(char*) );
+  unsigned char* dst = buf;
   char* src = NULL;
   char* ptr = string;
   while( *ptr )
@@ -1693,8 +2307,18 @@ char* DateTimeNow( char* buf, int bufLen, int showSeconds )
   if( buf==NULL || bufLen<21 )
     Error( "DateTimeNow called with too-small buffer" );
   (void)DateNow( buf, 11 );
-  buf[10] = 0;
+  buf[10] = ' ';
   (void)TimeNow( buf+11, 9, showSeconds );
+  return buf;
+  }
+
+char* DateTimeStr( char* buf, int bufLen, int showSeconds, time_t t )
+  {
+  if( buf==NULL || bufLen<21 )
+    Error( "DateTimeNow called with too-small buffer" );
+  (void)DateStr( t, buf, 11 );
+  buf[10] = ' ';
+  (void)TimeStr( t, buf+11, 9, showSeconds );
   return buf;
   }
 
@@ -1715,8 +2339,8 @@ int ValidDate( char* when )
 int ValidTime( char* when )
   {
   int h=0, m=0, s=0;
-  if( sscanf( when, "%d-%d-%d", &h, &m, &s )!=3
-      && sscanf( when, "%d-%d", &h, &m )!=2 )
+  if( sscanf( when, "%d:%d:%d", &h, &m, &s )!=3
+      && sscanf( when, "%d:%d", &h, &m )!=2 )
     return -1;
   if( h<0 || h>23 )
     return -2;
@@ -1725,22 +2349,6 @@ int ValidTime( char* when )
   if( s<0 || s>59 )
     return -4;
   return 0;
-  }
-
-char* GUID()
-  {
-  FILE* h = popen( "/usr/bin/uuidgen", "r" );
-  if( h==NULL )
-    {
-    Error( "Cannot launch /usr/bin/uuidgen (%d:%s)", errno, strerror( errno ) );
-    }
-  char buf[BUFLEN];
-  if( fgets( buf, sizeof(buf)-1, h )!=buf )
-    {
-    Error( "Cannot read from /usr/bin/uuidgen (%d:%s)", errno, strerror( errno ) );
-    }
-  fclose( h );
-  return strdup( StripEOL( buf ) );
   }
 
 int CountFilesInFolder( char* folder, char* prefix, char* suffix,
@@ -1824,7 +2432,21 @@ int ListToJSON( _TAG_VALUE* list, char* buf, int bufLen )
 
   char* ptr = buf;
   char* end = buf+bufLen-1;
-  strcpy( ptr, "{ " );
+  int inArray = 0;
+  for( _TAG_VALUE* tv=list; tv!=NULL; tv=tv->next )
+    {
+    if( EMPTY( tv->tag ) )
+      {
+      inArray = 1;
+      break;
+      }
+    }
+
+  if( inArray )
+    strcpy( ptr, "[ " );
+  else
+    strcpy( ptr, "{ " );
+
   ptr += strlen( ptr );
 
   int itemNum = 0;
@@ -1835,22 +2457,73 @@ int ListToJSON( _TAG_VALUE* list, char* buf, int bufLen )
       strncpy( ptr, ", ", end-ptr );
       ptr += strlen( ptr );
       }
-    if( NOTEMPTY( list->tag )
-        && NOTEMPTY( list->value ) )
+
+    if( NOTEMPTY( list->tag ) )
       {
-      snprintf( ptr, end-ptr, "\"%s\": \"%s\"", list->tag, list->value );
+      snprintf( ptr, end-ptr, "\"%s\": ", list->tag );
       ptr += strlen( ptr );
-      ++itemNum;
       }
-    else if( NOTEMPTY( list->tag ) )
-      {
-      snprintf( ptr, end-ptr, "\"%s\": %d", list->tag, list->iValue );
+
+    if( list->subHeaders==NULL )
+      { /* scalar value or empty list */
+      switch( list->type )
+        {
+        case VT_INVALID:
+          Warning( "Composing tags into JSON - [%s] has invalid type", NULLPROTECT( list->tag ) );
+          break;
+
+        case VT_STR:
+          if( NOTEMPTY( list->value ) )
+            {
+            snprintf( ptr, end-ptr, "\"%s\"", list->value );
+            ptr += strlen( ptr );
+            }
+          else
+            {
+            snprintf( ptr, end-ptr, "\"\"" );
+            ptr += strlen( ptr );
+            }
+          break;
+
+        case VT_INT:
+          snprintf( ptr, end-ptr, "%d", list->iValue );
+          ptr += strlen( ptr );
+          break;
+
+        case VT_DOUBLE:
+          snprintf( ptr, end-ptr, "%lf", list->dValue );
+          ptr += strlen( ptr );
+          break;
+
+        case VT_LIST:
+          snprintf( ptr, end-ptr, "[ ]" );
+          ptr += strlen( ptr );
+          break;
+
+        case VT_NULL:
+          snprintf( ptr, end-ptr, "null" );
+          ptr += strlen( ptr );
+          break;
+        }
+      }
+    else
+      { /* vector value in subheaders */
+      strncpy( ptr, "[", end-ptr );
+      int err = ListToJSON( list->subHeaders, ptr, end-ptr );
       ptr += strlen( ptr );
-      ++itemNum;
+      strncpy( ptr, "]", end-ptr );
+      if( err )
+        return err;
       }
+
+    ++itemNum;
     }
 
-  strcpy( ptr, " }" );
+  if( inArray )
+    strncpy( ptr, " ]", end-ptr );
+  else
+    strncpy( ptr, " }", end-ptr );
+
   ptr += strlen( ptr );
 
   return 0;
@@ -1889,6 +2562,42 @@ int NestedListToJSON( char* arrayName, _TAG_VALUE* list, char* buf, int bufLen )
   return 0;
   }
 
+int JSONToHTTPPost( char* relURL, char* json, char* buf, int bufLen )
+  {
+  if( buf==NULL || bufLen<10 )
+    {
+    Warning( "JSONToHTTPPost - NULL or short output buffer (aborting)" );
+    return -1;
+    }
+
+  if( EMPTY( json ) )
+    {
+    Warning( "JSONToHTTPPost - NULL or empty JSON (continuing with empty string)" );
+    buf[0] = 0;
+    }
+
+  char* ptr = buf;
+  snprintf( ptr, bufLen, "POST %s HTTP/1.1\r\n", relURL );
+  bufLen -= strlen( ptr );
+  ptr += strlen( ptr );
+
+  int l = 0;
+  if( NOTEMPTY( json ) )
+    l = strlen( json );
+
+  snprintf( ptr, bufLen, "Content-Length: %d\r\n", l );
+  bufLen -= strlen( ptr );
+  ptr += strlen( ptr );
+
+  snprintf( ptr, bufLen, "Content-Type: application/json\r\n\r\n" );
+  bufLen -= strlen( ptr );
+  ptr += strlen( ptr );
+
+  snprintf( ptr, bufLen, "%s\r\n", NULLPROTECT(json) );
+
+  return 0;
+  }
+
 long long TimeInMicroSeconds()
   {
   struct timeval te; 
@@ -1897,3 +2606,1064 @@ long long TimeInMicroSeconds()
   return us;
   }
 
+char* TypeName( enum valueType t )
+  {
+  switch( t )
+    {
+    case VT_STR: return "STR";
+    case VT_INT: return "INT";
+    case VT_DOUBLE: return "DOUBLE";
+    default: return "UNDEFINED";
+    }
+  }
+
+int POpenAndRead( const char *cmd, int* readPtr, pid_t* childPtr )
+  {
+  int fd[2];
+  int readFD = -1;
+  int writeFD = -1;
+  int pid = -1;
+
+  /* Create a pipe to talk to the child */
+  int err = pipe( fd );
+  if( err<0 )
+    Error( "Failed to pipe() - %d:%s", errno, strerror( errno ) );
+
+  readFD = fd[0];
+  writeFD = fd[1];
+
+  /* Fork so we have parent/child processes */
+  pid = fork();
+  if( pid<0 )
+    Error( "Failed to fork() - %d:%s", errno, strerror( errno ) );
+
+  if( pid == 0 ) /* child */
+    {
+    NARGV* args = nargv_parse( cmd );
+    if( args==NULL )
+      Error( "Failed to parse cmd line [%s]", cmd );
+    fflush( stdout );
+    close( readFD );
+    dup2( writeFD, 1 );
+    close( writeFD );
+    (void)execv( args->argv[0], args->argv );
+    /* end of code */
+    }
+  else /* parent */
+    {
+    *childPtr = pid;
+    close( writeFD );
+    *readPtr = readFD;
+    fcntl( readFD, F_SETFL, O_NONBLOCK );
+    }
+
+  return 0;
+  }
+
+int POpenAndSearch( const char *cmd, char* subString, char** result )
+  {
+  if( EMPTY( cmd ) || EMPTY( subString ) )
+    return -1;
+
+  int fileDesc = -1;
+  pid_t child = -1;
+  int err = POpenAndRead( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child [%s].", cmd );
+
+  int flags = fcntl( fileDesc, F_GETFL);
+  flags &= ~O_NONBLOCK;
+  fcntl( fileDesc, F_SETFL, flags);
+
+  FILE* f = fdopen( fileDesc, "r" );
+  char buf[BUFLEN];
+  while( fgets( buf, sizeof(buf)-1, f )==buf )
+    {
+    if( strstr( buf, subString )!=NULL )
+      {
+      fclose( f );
+      if( result!=NULL )
+        *result = strdup( buf );
+      return 0;
+      }
+    }
+
+  fclose( f );
+  return -2;
+  }
+
+int POpenAndReadWrite( const char* cmd, int* readFD, int* writeFD, pid_t* child )
+  {
+  int err = 0;
+  int input[2];
+  int inputRead = -1;
+  int inputWrite = -1;
+  int output[2];
+  int outputRead = -1;
+  int outputWrite = -1;
+  int pid = -1;
+
+  /* Create pipes to talk to the child */
+  err = pipe( input );
+  if( err<0 )
+    Error( "Failed to pipe() - %d:%s", errno, strerror( errno ) );
+
+  inputRead = input[0];
+  inputWrite = input[1];
+
+  err = pipe( output );
+  if( err<0 )
+    Error( "Failed to pipe() - %d:%s", errno, strerror( errno ) );
+
+  outputRead = output[0];
+  outputWrite = output[1];
+
+  /* Fork so we have parent/child processes */
+  pid = fork();
+  if( pid<0 )
+    Error( "Failed to fork() - %d:%s", errno, strerror( errno ) );
+
+  if( pid == 0 ) /* child */
+    {
+    NARGV* args = nargv_parse( cmd );
+    if( args==NULL )
+      Error( "Failed to parse cmd line [%s]", cmd );
+    close( inputWrite );
+    close( outputRead );
+    dup2( inputRead, 0 );
+    close( inputRead );
+    dup2( outputWrite, 1 );
+    dup2( outputWrite, 2 );
+    close( outputWrite );
+    (void)execv( args->argv[0], args->argv );
+    /* end of code */
+    }
+  else /* parent */
+    {
+    *child = pid;
+    close( inputRead );
+    close( outputWrite );
+    *readFD = outputRead;
+    *writeFD = inputWrite;
+    fcntl( outputRead, F_SETFL, O_NONBLOCK );
+    }
+
+  return 0;
+  }
+
+int POpenAndWrite( const char *cmd, int* writePtr, pid_t* childPtr )
+  {
+  int fd[2];
+  int readFD = -1;
+  int writeFD = -1;
+  int pid = -1;
+
+  /* Create a pipe to talk to the child */
+  int err = pipe( fd );
+  if( err<0 )
+    Error( "Failed to pipe() - %d:%s", errno, strerror( errno ) );
+
+  readFD = fd[0];
+  writeFD = fd[1];
+
+  /* Fork so we have parent/child processes */
+  pid = fork();
+  if( pid<0 )
+    Error( "Failed to fork() - %d:%s", errno, strerror( errno ) );
+
+  if( pid == 0 ) /* child */
+    {
+    NARGV* args = nargv_parse( cmd );
+    if( args==NULL )
+      Error( "Failed to parse cmd line [%s]", cmd );
+    fflush( stdout );
+    close( writeFD );
+    dup2( readFD, 0 );
+    close( readFD );
+    close( 2 );
+    (void)execv( args->argv[0], args->argv );
+    /* end of code */
+    }
+  else /* parent */
+    {
+    *childPtr = pid;
+    close( readFD );
+    *writePtr = writeFD;
+    fcntl( writeFD, F_SETFL, O_NONBLOCK );
+    }
+
+  return 0;
+  }
+
+int AsyncReadFromChildProcess( char* cmd,
+                               int sleepSeconds,
+                               void* params,
+                               void (*GotLineCallback)( void*, char* ),
+                               void (*TimeoutCallback)( void* )
+                               )
+  {
+  int fileDesc = -1;
+  pid_t child = -1;
+  int err = POpenAndRead( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child." );
+
+  char buf[BUFLEN];
+  char* ptr = NULL;
+  char* endPtr = buf + sizeof(buf) - 2;
+
+  int retVal = 0;
+  int exited = 0;
+
+  for(;;)
+    {
+    int nBytesRead = 0;
+    ptr = buf;
+    *ptr = 0;
+
+    for( ptr=buf; ptr<endPtr; ++ptr )
+      {
+      nBytesRead = read( fileDesc, ptr, 1 );
+      if( nBytesRead<=0 )
+        {
+        *ptr = 0;
+        break;
+        }
+      if( *ptr=='\n' )
+        {
+        ++ptr;
+        *ptr = 0;
+        break;
+        }
+      }
+
+    if( nBytesRead>0 && buf[0]!=0 )
+      {
+      (*GotLineCallback)( params, buf );
+      buf[0] = 0;
+      }
+/*
+    else
+      {
+      printf("Read %d bytes starting with a %d byte\n", (int)(ptr-buf), (int)buf[0] );
+      }
+*/
+
+    retVal = 0;
+    int wstatus;
+    if( waitpid( child, &wstatus, WNOHANG )==-1 )
+      {
+      Notice( "waitpid returned -1.\n");
+      retVal = -1;
+      break;
+      }
+    if( WIFEXITED( wstatus ) )
+      {
+      exited = 1;
+      Notice( "child exited.\n");
+      retVal = 0;
+      break;
+      }
+
+    if( nBytesRead<=0 )
+      {
+      sleep( sleepSeconds );
+      (*TimeoutCallback)( params );
+      }
+    }
+
+  close( fileDesc );
+  if( ! exited )
+    {
+    kill( child, SIGHUP );
+    }
+
+  return retVal;
+  }
+
+int ReadLineFromCommand( char* cmd, char* buf, int bufSize, int timeoutSeconds, int maxtimeSeconds )
+  {
+  int fileDesc = -1;
+  pid_t child = -1;
+
+  int err = POpenAndRead( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child to run [%s].", cmd );
+
+  char* ptr = buf;
+  char* endPtr = buf + bufSize - 2;
+
+  int retVal = 0;
+  time_t tStart = time(NULL);
+  int exited = 0;
+
+  for(;;)
+    {
+    if( (int)(time(NULL) - tStart) >= maxtimeSeconds )
+      {
+      retVal = -3;
+      break;
+      }
+
+    fd_set readSet;
+    fd_set exceptionSet;
+    struct timeval timeout;
+
+    FD_ZERO( &readSet );
+    FD_SET( fileDesc, &readSet );
+    FD_ZERO( &exceptionSet );
+    FD_SET( fileDesc, &exceptionSet );
+    timeout.tv_sec = timeoutSeconds;
+    timeout.tv_usec = 0;
+    
+    int result = select( fileDesc+1, &readSet, NULL, &exceptionSet, &timeout );
+    if( result>0 )
+      {
+      int nBytes = read( fileDesc, ptr, endPtr-ptr );
+      if( nBytes>0 )
+        {
+        ptr += nBytes;
+        *ptr = 0;
+        if( strchr( buf, '\n' )!=NULL )
+          {
+          break;
+          }
+        }
+      }
+
+    int wStatus;
+    if( waitpid( child, &wStatus, WNOHANG )==-1 )
+      {
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      retVal = -1;
+      break;
+      }
+
+    if( WIFEXITED( wStatus ) )
+      {
+      exited = 1;
+      Notice( "child exited.\n");
+      retVal = 0;
+      break;
+      }
+    }
+
+  close( fileDesc );
+
+  if( ! exited )
+    {
+    kill( child, SIGHUP );
+    }
+
+  return retVal;
+  }
+
+int ReadLinesFromCommand( char* cmd, char** bufs, int nBufs, int bufSize, int timeoutSeconds, int maxtimeSeconds )
+  {
+  int fileDesc = -1;
+  pid_t child = -1;
+
+  for( int i=0; i<nBufs; ++i )
+    *(bufs[i]) = 0;
+
+  int err = POpenAndRead( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child to run [%s].", cmd );
+
+  int lineNo = 0;
+  char* ptr = bufs[lineNo];
+  char* endPtr = ptr + bufSize - 2;
+
+  int retVal = 0;
+  time_t tStart = time(NULL);
+
+  int exited = 0;
+
+  while( fileDesc > 0 )
+    {
+    if( (int)(time(NULL) - tStart) >= maxtimeSeconds )
+      {
+      retVal = -3;
+      break;
+      }
+
+    fd_set readSet;
+    fd_set exceptionSet;
+    struct timeval timeout;
+
+    FD_ZERO( &readSet );
+    FD_SET( fileDesc, &readSet );
+    FD_ZERO( &exceptionSet );
+    FD_SET( fileDesc, &exceptionSet );
+    timeout.tv_sec = timeoutSeconds;
+    timeout.tv_usec = 0;
+    
+    int result = select( fileDesc+1, &readSet, NULL, &exceptionSet, &timeout );
+    if( result>0 )
+      {
+      char tinyBuf[2];
+      tinyBuf[0] = 0;
+      int n = 0;
+      while( ptr < endPtr && (n=read( fileDesc, tinyBuf, 1 ))==1 )
+        {
+        int c = tinyBuf[0];
+        if( c=='\n' )
+          {
+          ++lineNo;
+          if( lineNo >= nBufs )
+            {
+            close( fileDesc );
+            fileDesc = -1;
+            break;
+            }
+          ptr = bufs[lineNo];
+          endPtr = ptr + bufSize - 2;
+          }
+        else
+          {
+          *ptr = c;
+          ++ptr;
+          *ptr = 0;
+          }
+        }
+      }
+
+    int wStatus;
+    if( waitpid( child, &wStatus, WNOHANG )==-1 )
+      {
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      retVal = -1;
+      break;
+      }
+
+    if( WIFEXITED( wStatus ) )
+      {
+      exited = 1;
+      Notice( "child exited.\n");
+      retVal = 0;
+      break;
+      }
+    }
+
+  if( fileDesc>0 )
+    {
+    close( fileDesc );
+    }
+
+  if( exited==0 )
+    {
+    kill( child, SIGHUP );
+    }
+
+  return retVal;
+  }
+
+int WriteReadLineToFromCommand( char* cmd, char* stdinLine, char* buf, int bufSize, int timeoutSeconds, int maxtimeSeconds )
+  {
+  int readFD = -1;
+  int writeFD = -1;
+  pid_t child = -1;
+
+  int err = POpenAndReadWrite( cmd, &readFD, &writeFD, &child );
+  if( err ) Error( "Cannot popen child to run [%s].", cmd );
+
+  int l = strlen(stdinLine);
+  int nBytes = write( writeFD, stdinLine, l );
+  if( nBytes>0 )
+    {
+    if( nBytes!=l )
+      Warning( "Tried to write %d bytes but only managed %d", l, nBytes );
+    }
+  close( writeFD );
+
+  char* ptr = buf;
+  char* endPtr = buf + bufSize - 2;
+
+  int retVal = 0;
+  time_t tStart = time(NULL);
+  int exited = 0;
+
+  for(;;)
+    {
+    if( (int)(time(NULL) - tStart) >= maxtimeSeconds )
+      {
+      retVal = -3;
+      break;
+      }
+
+    fd_set readSet;
+    fd_set exceptionSet;
+    struct timeval timeout;
+
+    FD_ZERO( &readSet );
+    FD_SET( readFD, &readSet );
+    FD_ZERO( &exceptionSet );
+    FD_SET( readFD, &exceptionSet );
+    timeout.tv_sec = timeoutSeconds;
+    timeout.tv_usec = 0;
+    
+    int result = select( readFD+1, &readSet, NULL, &exceptionSet, &timeout );
+    if( result>0 )
+      {
+      int nBytes = read( readFD, ptr, endPtr-ptr );
+      if( nBytes>0 )
+        {
+        ptr += nBytes;
+        *ptr = 0;
+        if( strchr( buf, '\n' )!=NULL )
+          {
+          break;
+          }
+        }
+      }
+
+    int wStatus;
+    if( waitpid( child, &wStatus, WNOHANG )==-1 )
+      {
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      retVal = -1;
+      break;
+      }
+
+    if( WIFEXITED( wStatus ) )
+      {
+      exited = 1;
+      Notice( "child exited.\n");
+      retVal = 0;
+      break;
+      }
+    }
+
+  close( readFD );
+  if( ! exited )
+    {
+    kill( child, SIGHUP );
+    }
+
+  return retVal;
+  }
+
+int WriteLineToCommand( char* cmd, char* stdinLine, int timeoutSeconds, int maxtimeSeconds )
+  {
+  int fileDesc = -1;
+  pid_t child = -1;
+
+  int err = POpenAndWrite( cmd, &fileDesc, &child );
+  if( err ) Error( "Cannot popen child to run [%s].", cmd );
+
+  int retVal = 0;
+  time_t tStart = time(NULL);
+  while( *stdinLine != 0 )
+    {
+    if( (int)(time(NULL) - tStart) >= maxtimeSeconds )
+      {
+      retVal = -3;
+      break;
+      }
+
+    fd_set writeSet;
+    fd_set exceptionSet;
+    struct timeval timeout;
+
+    FD_ZERO( &writeSet );
+    FD_SET( fileDesc, &writeSet );
+    FD_ZERO( &exceptionSet );
+    FD_SET( fileDesc, &exceptionSet );
+    timeout.tv_sec = timeoutSeconds;
+    timeout.tv_usec = 0;
+    
+    int result = select( fileDesc+1, NULL, &writeSet, &exceptionSet, &timeout );
+    if( result>0 )
+      {
+      int l = strlen( stdinLine );
+      int nBytes = write( fileDesc, stdinLine, l );
+      if( nBytes>0 )
+        {
+        if( nBytes!=l )
+          Warning( "Tried to write %d bytes but only managed %d", l, nBytes );
+        stdinLine += nBytes;
+        }
+      }
+    else
+      {
+      Warning( "Timeout waiting for child - %d:%d:%s", err, errno, strerror( errno ) );
+      }
+    }
+
+  close( fileDesc );
+
+  int wStatus;
+  if( waitpid( child, &wStatus, WNOHANG )==-1 )
+    {
+    Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+    retVal = -1;
+    }
+
+  if( WIFEXITED( wStatus ) )
+    {
+    Notice( "child exited.\n");
+    retVal = 0;
+    }
+
+  if( retVal != 0 )
+    {
+    kill( child, SIGHUP );
+    }
+
+  return retVal;
+  }
+
+/* 0 return only indicates that child forked successfully */
+int AsyncRunCommandNoIO( char* cmd )
+  {
+  if( EMPTY( cmd ) )
+    return -1;
+
+  NARGV* args = nargv_parse( cmd );
+  if( args==NULL )
+    Error( "Failed to parse cmd line [%s]", cmd );
+
+  pid_t pid = fork();
+  if( pid<0 )
+    Error( "Failed to fork() - %d:%s", errno, strerror( errno ) );
+
+  if( pid == 0 ) /* child */
+    {
+    close( 0 );
+    close( 1 );
+    close( 2 );
+    (void)execv( args->argv[0], args->argv );
+    /* end of code */
+    }
+
+  nargv_free( args );
+
+  return 0;
+  }
+
+void SignalHandler( int signo )
+  {
+  if( signo == SIGHUP )
+    {
+    syslog( LOG_NOTICE, "Received SIGHUP - exiting" );
+    exit( 0 );
+    }
+  else if( signo == SIGUSR1 )
+    {
+    syslog( LOG_NOTICE, "Received SIGUSR1 - closing handle" );
+    void EmergencyCloseHandles();
+    }
+  }
+
+void GrabEndOfFile( FILE* input, char* output, int outputLen )
+  {
+  char* endPtr = output + outputLen - 1;
+  char* ptr = output;
+  char buf[BUFLEN];
+  while( fgets( buf, sizeof(buf)-1, input )==buf )
+    {
+    strncpy( ptr, buf, endPtr-ptr );
+    ptr += strlen( buf );
+    *ptr = 0;
+    }
+  }
+
+void TailFile( FILE* input, int nLines, char* output, int outputLen )
+  {
+  if( input==NULL || nLines<1 || output==NULL || outputLen<2 )
+    Error( "Abuse of TailFile" );
+
+  fseek( input, 0, SEEK_END );
+  off_t pos = ftell( input );
+  int gotLines = 0;
+  int c = -1;
+
+  while( pos>=0 )
+    {
+    if( pos==0 )
+      {
+      ++gotLines;
+      break;
+      }
+
+    fseek( input, pos, SEEK_SET );
+    c = fgetc( input );
+
+    if( c=='\n' )
+      ++gotLines;
+
+    if( gotLines>nLines )
+      break;
+
+    --pos;
+    }
+
+  if( pos<=0 )
+    {
+    pos = 0;
+    fseek( input, pos, SEEK_SET );
+    }
+
+  GrabEndOfFile( input, output, outputLen );
+  }
+
+int IsRecent( time_t when, int maxAge )
+  {
+  int nSeconds = (int)(time(NULL) - when);
+  nSeconds = abs( nSeconds );
+  if( nSeconds < maxAge )
+    return 1;
+  return 0;
+  }
+
+char* GenerateAllocateGUID()
+  {
+  char buf[100];
+
+  uuid_t x;
+  uuid_generate( x );
+  uuid_unparse_lower( x, buf );
+
+  return strdup( buf );
+  }
+
+/*
+  Time strings converted to time_t.
+  Either relative to "now" or absolute time/date.
+  Formats as follows:
+  +20m
+  +2h15m
+  2021-07-02 19:00:00
+*/
+time_t ParseTimeString( char* str )
+  {
+  if( EMPTY( str ) )
+    return 0;
+
+  time_t tNow = time(NULL);
+
+  int Y=0;
+  int M=0;
+  int D=0;
+  int h=0;
+  int m=0;
+  int s=0;
+
+  if( str[0]=='+' )
+    {
+    if( StringMatchesRegex( "[0-9]+h[0-9]+m", str+1 )==0
+        && sscanf( str+1, "%dh%dm", &h, &m )==2 )
+      return tNow + h*60*60 + m*60;
+    else if( StringMatchesRegex( "[0-9]+h", str+1 )==0
+        && sscanf( str+1, "%dh", &h )==1 )
+      return tNow + h*60*60;
+    else if( StringMatchesRegex( "[0-9]+m", str+1 )==0
+        && sscanf( str+1, "%dm", &m )==1 )
+      return tNow + m*60;
+    else if( StringMatchesRegex( "[0-9]+s", str+1 )==0
+        && sscanf( str+1, "%ds", &s )==1 )
+      return tNow + s;
+    else if( StringMatchesRegex( "[0-9]+m[0-9]+s", str+1 )==0
+        && sscanf( str+1, "%dm%ds", &m, &s )==2 )
+      return tNow + m*60 + s;
+    else if( StringMatchesRegex( "[0-9]+h[0-9]+m[0-9]+s", str+1 )==0
+        && sscanf( str+1, "%dh%dm%ds", &h, &m, &s )==3 )
+      return tNow + h*60*60 + m*60 + s;
+    else
+      return -1;
+    }
+
+  char* sp = strchr( str, ' ' );
+  if( sp==NULL )
+    return -1;
+
+  if( ValidDate( str )==0
+      && ValidTime( sp+1 )==0
+      && sscanf( str, "%d-%d-%d", &Y, &M, &D )==3
+      && ( sscanf( sp+1, "%d:%d:%d", &h, &m, &s )==3
+           || sscanf( sp+1, "%d:%d", &h, &m )==2 ) )
+    {
+    struct tm *tmPtr = localtime( &tNow );
+    struct tm tStr;
+    memset( &tStr, 0, sizeof( tStr ) );
+    tStr.tm_year = Y - 1900;
+    tStr.tm_mon = M - 1;
+    tStr.tm_mday = D;
+    tStr.tm_hour = h;
+    tStr.tm_min = m;
+    tStr.tm_sec = s;
+    tStr.tm_isdst = tmPtr->tm_isdst;
+    return mktime( &tStr );
+    }
+
+  return -1;
+  }
+
+int LockFile( char* fileName )
+  {
+  int fd = open( fileName, O_CREAT | O_WRONLY, S_IRWXU );
+
+  struct flock fl;
+  fl.l_type   = F_WRLCK;  /* F_RDLCK, F_WRLCK, F_UNLCK    */
+  fl.l_whence = SEEK_SET; /* SEEK_SET, SEEK_CUR, SEEK_END */
+  fl.l_start  = 0;        /* Offset from l_whence         */
+  fl.l_len    = 1;        /* length, 0 = to EOF           */
+  fl.l_pid    = getpid(); /* our PID                      */
+
+  int err = fcntl(fd, F_SETLKW, &fl);  /* set the lock, waiting if necessary */
+
+  if( err )
+    {
+    printf( "Lockf error - %d / %d / %s\n", err, errno, strerror( errno ) );fflush(stdout);
+    close( fd );
+    return -1;
+    }
+
+  return fd;
+  }
+
+int UnLockFile( int fd )
+  {
+  if( fd<=0 )
+    return -1;
+
+  struct flock fl;
+  fl.l_type   = F_UNLCK;
+  fl.l_whence = SEEK_SET;
+  fl.l_start  = 0;
+  fl.l_len    = 1;
+  fl.l_pid    = getpid();
+
+  int err1 = fcntl(fd, F_SETLKW, &fl);
+
+  int err2 = close( fd );
+
+  if( err1 )
+    return err1;
+
+  if( err2 )
+    return err2;
+
+  return 0;
+  }
+
+int Touch( char* path )
+  {
+  if( EMPTY( path ) )
+    Error( "Cannot Touch(NULL)" );
+
+  FILE* f = fopen( path, "a" );
+  if( f!=NULL )
+    {
+    fclose( f );
+    return 0;
+    }
+  else
+    Warning( "Failed to fopen(%s,a)", path );
+
+  return -1;
+  }
+
+uid_t GetUID( const char* logName )
+  {
+  if( EMPTY( logName ) )
+    Error( "GetUID(NULL)" );
+  struct passwd* p = getpwnam( logName );
+  if( p==NULL )
+    Error( "GetUID(%s) -> invalid user", logName );
+  return p->pw_uid;
+  }
+
+gid_t GetGID( const char* groupName )
+  {
+  if( EMPTY( groupName ) )
+    Error( "GetjID(NULL)" );
+  struct group* g = getgrnam( groupName );
+  if( g==NULL )
+    Error( "GetGID(%s) -> invalid group", groupName );
+  return g->gr_gid;
+  }
+
+int TouchEx( const char* folder, const char* fileName, const char* user, const char* group, mode_t mode )
+  {
+  if( EMPTY( folder )
+      || EMPTY( fileName )
+      || EMPTY( user )
+      || EMPTY( group )
+      || mode==0 )
+    Error( "TouchEx(...NULL...)" );
+
+  int err = 0;
+  char* fullPath = MakeFullPath( folder, fileName );
+  err = FileExists( fullPath );
+  if( err!=0 )
+    { /* create it */
+    err = Touch( fullPath );
+    if( err!=0 )
+      { /* failed */
+      return err;
+      }
+    }
+
+  /* should exist now */
+  uid_t userNum = GetUID( user );
+  gid_t groupNum = GetGID( group );
+  err = chown( fullPath, userNum, groupNum );
+  if( err )
+    {
+    Warning( "chown( %s, %d, %d ) -> %d:%d:%s",
+           fullPath, (int)userNum, (int)groupNum, err, errno, strerror( errno ) );
+    return err;
+    }
+
+  err = chmod( fullPath, mode );
+  if( err )
+    {
+    Warning( "chmod( %s, %d ) -> %d:%d:%s",
+           fullPath, (int)mode, err, errno, strerror( errno ) );
+    return err;
+    }
+
+  return 0;
+  }
+
+char* AggregateMessages( _TAG_VALUE* messages )
+  {
+  int length = 0;
+  int n = 0;
+  for( _TAG_VALUE* tv = messages; tv!=NULL; tv=tv->next )
+    {
+    if( NOTEMPTY( tv->value ) )
+      {
+      ++n;
+      length += strlen( tv->value );
+      }
+    }
+
+  if( n==0 || length==0 )
+    return NULL;
+
+  char* buf = (char*)calloc( length + n*5, sizeof(char) );
+  char* ptr = buf;
+
+  for( _TAG_VALUE* tv = messages; tv!=NULL; tv=tv->next )
+    {
+    if( NOTEMPTY( tv->value ) )
+      {
+      strcpy( ptr, tv->value );
+      ptr += strlen( tv->value );
+      strcpy( ptr, ". " );
+      ptr += strlen( tv->value );
+      }
+    }
+
+  return buf;
+  }
+
+#define GETAPACHEUSER\
+  "/bin/bash -c 'cat /etc/apache2/* 2>/dev/null | grep APACHE_RUN_USER= | sed \"s/.*=//\"'"
+
+char* GetWebUser()
+  {
+  char buf[BUFLEN];
+  int err = ReadLineFromCommand( GETAPACHEUSER, buf, sizeof(buf)-1, 1, 5 );
+  if( err )
+    Error( "Failed to find apache2 username from cmd [%s] -- %d:%d:%s",
+           GETAPACHEUSER, err, errno, strerror( errno ) );
+  return strdup( strtok( buf, "\r\n" ) );
+  }
+
+#define GETAPACHEGROUP\
+  "/bin/bash -c 'cat /etc/apache2/* 2>/dev/null | grep APACHE_RUN_GROUP= | sed \"s/.*=//\"'"
+
+char* GetWebGroup()
+  {
+  char buf[BUFLEN];
+  int err = ReadLineFromCommand( GETAPACHEGROUP, buf, sizeof(buf)-1, 1, 5 );
+  if( err )
+    Error( "Failed to find apache2 groupname from cmd [%s] -- %d:%d:%s",
+           GETAPACHEGROUP, err, errno, strerror( errno ) );
+  return strdup( strtok( buf, "\r\n" ) );
+  }
+
+int RotateFile( char* path, int keepN )
+  {
+  int err = 0;
+
+  /* possibly remove old rotated files first */
+  char folderPart[BUFLEN];
+  char* filePart;
+  folderPart[0] = 0;
+  (void)GetFolderFromPath( path, folderPart, sizeof(folderPart)-1 );
+  filePart = GetFilenameFromPath( path );
+  if( NOTEMPTY( folderPart )
+      && NOTEMPTY( filePart ) )
+    {
+    char prefix[BUFLEN];
+    snprintf( prefix, sizeof(prefix)-1, "%s-", filePart );
+    char** fileNames = NULL;
+    int nFiles = GetOrderedDirectoryEntries( folderPart, prefix, NULL, &fileNames, 1 );
+    if( nFiles > keepN )
+      {
+      for( int i=0; i < (nFiles-keepN); ++i )
+        {
+        char toRemove[BUFLEN*2];
+        snprintf( toRemove, sizeof(toRemove)-1, "%s/%s", folderPart, fileNames[i] );
+        err = unlink( toRemove );
+        if( err )
+          Warning( "Tried to remove [%s] - got %d:%d:%s", err, errno, strerror( errno ) );
+        }
+      }
+    if( nFiles )
+      FreeArrayOfStrings( fileNames, nFiles );
+    }
+
+  char friendlyTime[BUFLEN];
+  (void)DateTimeStr( friendlyTime, sizeof( friendlyTime )-1, 0, time(NULL) );
+  int l = strlen( path ) + strlen( friendlyTime ) + 10;
+  char* newName = (char*)SafeCalloc( l, sizeof(char), "path for file rotation" );
+  strcpy( newName, path );
+  strcat( newName, "-" );
+  strcat( newName, friendlyTime );
+  err = rename( path, newName );
+  if( err )
+    Warning( "Failed to rename [%s] to [%s] - %d:%d:%s",
+             path, newName, err, errno, strerror( errno ) );
+  FREE( newName );
+  return err;
+  }
+
+void KillExistingCommandInstances( char* commandLine )
+  {
+  if( EMPTY( commandLine ) )
+    return;
+
+  Notice( "KillExistingCommandInstances( %s )", commandLine );
+  char* procLine = NULL;
+  int nTries = 10;
+  while( POpenAndSearch( "/bin/ps -efww", commandLine, &procLine )==0
+         && nTries-- )
+    {
+    Notice( "Command [%s] already running - will try to stop it", commandLine );
+    if( NOTEMPTY( procLine ) )
+      {
+      char* ptr = NULL;
+      char* userID = strtok_r( procLine, " \t\r\n", &ptr );
+      char* processID = strtok_r( NULL, " \t\r\n", &ptr );
+      long pidNum = -1;
+      if( NOTEMPTY( processID ) )
+        pidNum = atol( processID );
+
+      Notice( "Killing process %ld which belongs to %s", pidNum, userID );
+      if( pidNum>0 )
+        {
+        int err = kill( (pid_t)pidNum, SIGHUP );
+        if( err )
+          {
+          Warning( "Failed to send HUP signal to process %d: %d:%d:%s",
+                   pidNum, err, errno, strerror( errno ) );
+          break;
+          }
+        else
+          sleep(1); /* might take a while to stop it */
+        }
+      FREE( procLine );
+      }
+    }
+  }

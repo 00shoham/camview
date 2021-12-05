@@ -151,6 +151,7 @@ int main( int argc, char** argv )
   long templateLenHead = FileRead( STATUS_HEAD_TEMPLATE, (unsigned char**)&templateHead );
   if( templateLenHead<=0 )
     {
+    FREE( templateHead );
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "Cannot open template page %s (%ld)", STATUS_HEAD_TEMPLATE, templateLenHead );
     }
@@ -158,6 +159,7 @@ int main( int argc, char** argv )
                             "TITLE", CAM_STATUS_PAGE_TITLE,
                             "CAMERAS", cameras,
                             NULL, NULL );
+  FREE( templateHead );
   if( err<0 )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
@@ -279,6 +281,8 @@ int main( int argc, char** argv )
         {
         printf( "<p class=\"status-good in-camera\">There are %d images in the capture folder.</p>\n", nFiles);
         }
+
+      FreeArrayOfStrings( folder, nFiles );
       }
     else
       {
@@ -332,6 +336,8 @@ int main( int argc, char** argv )
                         "PROBLEMS", nProblemsStr,
                         "BADCAMERAS", nProblemCamerasStr,
                         NULL, NULL );
+  FREE( templateFoot );
+
   if( err<0 )
     {
     Error( "Cannot expand page footer template" );
