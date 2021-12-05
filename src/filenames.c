@@ -133,6 +133,7 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
   else
     {
     /* in parent - return to caller*/
+    Notice( "Forked off backup command.  All done for now." );
     return;
     }
   }

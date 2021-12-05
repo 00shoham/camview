@@ -419,7 +419,17 @@ void KillCameraProcess( _CAMERA* cam )
 
 void StoreImage( _CONFIG* config, _CAMERA* cam, char* fileName, int size, int deltaTime )
   {
-  pthread_mutex_lock( &(cam->lock) );
+  int err = 0;
+
+  err = pthread_mutex_lock( &(cam->lock) );
+
+  if( err )
+    {
+    Warning( "StoreImage() - Failed ot get mutex on %d (%s) - %d:%d:%s",
+             cam->lock, cam->nickName, err,
+             errno, strerror( errno ) );
+    return;
+    }
   /*
   Notice( "StoreImage( ..., %s, %s, %d, %d )",
           cam->nickName, fileName, size, deltaTime );
@@ -430,7 +440,7 @@ void StoreImage( _CONFIG* config, _CAMERA* cam, char* fileName, int size, int de
     {
     char newName[BUFLEN];
     snprintf( newName, sizeof(newName)-1, "image-%s.jpg", nowName );
-    int err = FileCopy2( cam->folderPath, fileName,
+    err = FileCopy2( cam->folderPath, fileName,
                          cam->backupFolderPath, newName );
     if( err )
       {
@@ -455,15 +465,22 @@ void StoreImage( _CONFIG* config, _CAMERA* cam, char* fileName, int size, int de
       ++ config->nFilesToBackup;
       if( config->nFilesToBackup >= config->fileCacheLength )
         {
-        BackupFiles( config->backupDir, config->filesToBackup, config->backupCommand );
-        FreeFilenames( config->filesToBackup );
+        _FILENAME* tmp = config->filesToBackup;
         config->filesToBackup = NULL;
         config->nFilesToBackup = 0;
+        BackupFiles( config->backupDir, tmp, config->backupCommand );
+        FreeFilenames( tmp );
         }
       }
     }
 
-  pthread_mutex_unlock( &(cam->lock) );
+  err = pthread_mutex_unlock( &(cam->lock) );
+  if( err )
+    {
+    Warning( "StoreImage() - Failed ot release mutex on %d (%s) - %d:%d:%s",
+             cam->lock, cam->nickName, err,
+             errno, strerror( errno ) );
+    }
   }
 
 void StoreImageIfDifferent( _CONFIG* config,
