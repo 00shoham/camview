@@ -119,7 +119,7 @@ void BackupFiles( char* parentFolder, _FILENAME* list, char* cmd )
     if( err )
       Warning( "Backup command failed to return to [%s] - %d:%d:%s",
                ptr, err, errno, strerror( errno ) );
-    Notice( "Forked off backup command.  All done for now." );
+    Notice( "Forked off backup in %s.", parentFolder );
     return;
     }
   }
