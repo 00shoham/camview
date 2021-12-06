@@ -1240,7 +1240,7 @@ int CompareTagValueList( _TAG_VALUE* a, _TAG_VALUE* b )
           }
         else
           {
-          int err = CompareTagValueList( tv->subHeaders, cmp );
+          int err = CompareTagValueList( tv->subHeaders, cmp->subHeaders );
           if( err!=0 )
             return -100 + err;
           }
