@@ -3419,7 +3419,7 @@ int LockFile( char* fileName )
 
   if( err )
     {
-    printf( "Lockf error - %d / %d / %s", err, errno, strerror( errno ) );fflush(stdout);
+    Warning( "Lockf error - %d / %d / %s", err, errno, strerror( errno ) );fflush(stdout);
     close( fd );
     return -1;
     }
