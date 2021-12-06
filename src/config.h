@@ -69,6 +69,5 @@ int ValidCamera( _CONFIG* config, char* name );
 int CountCameras( _CONFIG* conf );
 void PrintVariable( _CONFIG* config, char* varName );
 void ValidateConfig( _CONFIG* config );
-char* ExtractUserIDOrDie( enum callMethod cm, _CONFIG* conf );
 
 #endif
