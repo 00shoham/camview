@@ -1191,18 +1191,21 @@ double GetTagValueDouble( _TAG_VALUE* list, char* tagName )
 
 _TAG_VALUE* GetTagValueList( _TAG_VALUE* list, char* tagName )
   {
-  if( EMPTY( tagName ) || list==NULL )
-    return NULL;
-
   _TAG_VALUE* retVal = NULL;
-  for( ; list!=NULL; list=list->next )
+  if( EMPTY( tagName ) )
     {
-    if( NOTEMPTY( list->tag )
-        && strcasecmp( list->tag, tagName )==0 )
+    return NULL;
+    }
+
+  while( list!=NULL )
+    {
+    if( NOTEMPTY(list->tag)
+        && strcasecmp(list->tag,tagName)==0 )
       {
       retVal = list->subHeaders;
       break;
       }
+    list = list->next;
     }
 
   return retVal;
@@ -1230,10 +1233,17 @@ int CompareTagValueList( _TAG_VALUE* a, _TAG_VALUE* b )
         {
         _TAG_VALUE* cmp = GetTagValueList( b, tv->tag );
         if( cmp==NULL )
-          return -100;
-        int err = CompareTagValueList( tv->subHeaders, cmp );
-        if( err!=0 )
-          return -100 + err;
+          return -10;
+        if( tv->subHeaders==NULL && cmp->subHeaders==NULL )
+          {
+          /* okay - same */
+          }
+        else
+          {
+          int err = CompareTagValueList( tv->subHeaders, cmp );
+          if( err!=0 )
+            return -100 + err;
+          }
         }
         break;
 
@@ -1285,15 +1295,14 @@ int CompareTagValueList( _TAG_VALUE* a, _TAG_VALUE* b )
         break;
       }
 
-    if( tv->type != VT_LIST
-        && tv->subHeaders!=NULL )
+    if( tv->subHeaders!=NULL )
       { /* not really a list but there are sub-headers anyways? */
       _TAG_VALUE* sub = GetTagValueList( b, tv->tag );
       if( sub==NULL )
-        return -200;
+        return -9;
       int err = CompareTagValueList( tv->subHeaders, sub );
-      if( err!=0 )
-        return -200 + err;
+      if( err )
+        return + err;
       }
 
     }
@@ -2851,14 +2860,14 @@ int AsyncReadFromChildProcess( char* cmd,
     int wstatus;
     if( waitpid( child, &wstatus, WNOHANG )==-1 )
       {
-      Notice( "waitpid returned -1.\n");
+      Notice( "waitpid returned -1.");
       retVal = -1;
       break;
       }
     if( WIFEXITED( wstatus ) )
       {
       exited = 1;
-      Notice( "child exited.\n");
+      Notice( "child exited.");
       retVal = 0;
       break;
       }
@@ -2931,7 +2940,7 @@ int ReadLineFromCommand( char* cmd, char* buf, int bufSize, int timeoutSeconds, 
     int wStatus;
     if( waitpid( child, &wStatus, WNOHANG )==-1 )
       {
-      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).", errno, strerror( errno ));
       retVal = -1;
       break;
       }
@@ -2939,7 +2948,7 @@ int ReadLineFromCommand( char* cmd, char* buf, int bufSize, int timeoutSeconds, 
     if( WIFEXITED( wStatus ) )
       {
       exited = 1;
-      Notice( "child exited.\n");
+      Notice( "child exited.");
       retVal = 0;
       break;
       }
@@ -3027,7 +3036,7 @@ int ReadLinesFromCommand( char* cmd, char** bufs, int nBufs, int bufSize, int ti
     int wStatus;
     if( waitpid( child, &wStatus, WNOHANG )==-1 )
       {
-      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).", errno, strerror( errno ));
       retVal = -1;
       break;
       }
@@ -3035,7 +3044,7 @@ int ReadLinesFromCommand( char* cmd, char** bufs, int nBufs, int bufSize, int ti
     if( WIFEXITED( wStatus ) )
       {
       exited = 1;
-      Notice( "child exited.\n");
+      Notice( "child exited.");
       retVal = 0;
       break;
       }
@@ -3116,7 +3125,7 @@ int WriteReadLineToFromCommand( char* cmd, char* stdinLine, char* buf, int bufSi
     int wStatus;
     if( waitpid( child, &wStatus, WNOHANG )==-1 )
       {
-      Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+      Notice( "waitpid returned -1 (error.  errno=%d/%s).", errno, strerror( errno ));
       retVal = -1;
       break;
       }
@@ -3124,7 +3133,7 @@ int WriteReadLineToFromCommand( char* cmd, char* stdinLine, char* buf, int bufSi
     if( WIFEXITED( wStatus ) )
       {
       exited = 1;
-      Notice( "child exited.\n");
+      Notice( "child exited.");
       retVal = 0;
       break;
       }
@@ -3191,13 +3200,13 @@ int WriteLineToCommand( char* cmd, char* stdinLine, int timeoutSeconds, int maxt
   int wStatus;
   if( waitpid( child, &wStatus, WNOHANG )==-1 )
     {
-    Notice( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+    Notice( "waitpid returned -1 (error.  errno=%d/%s).", errno, strerror( errno ));
     retVal = -1;
     }
 
   if( WIFEXITED( wStatus ) )
     {
-    Notice( "child exited.\n");
+    Notice( "child exited.");
     retVal = 0;
     }
 
@@ -3410,7 +3419,7 @@ int LockFile( char* fileName )
 
   if( err )
     {
-    printf( "Lockf error - %d / %d / %s\n", err, errno, strerror( errno ) );fflush(stdout);
+    printf( "Lockf error - %d / %d / %s", err, errno, strerror( errno ) );fflush(stdout);
     close( fd );
     return -1;
     }
@@ -3667,3 +3676,4 @@ void KillExistingCommandInstances( char* commandLine )
       }
     }
   }
+
