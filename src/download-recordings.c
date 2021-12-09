@@ -292,7 +292,7 @@ char* ExecuteDownload( int* cameras,
               archiveFile,
               listFileName );
     Notice( "Running - %s", cmd );
-    err = system( cmd );
+    err = SyncRunCommandNoIO( cmd );
     if( err==-1 && errno==ECHILD )
       { /* child exited, no return code */
       err = 0;
@@ -324,7 +324,7 @@ char* ExecuteDownload( int* cameras,
               listFileName,
               archiveFile );
     Notice("Running - %s", cmd );
-    err = system( cmd );
+    err = SyncRunCommandNoIO( cmd );
     if( err==-1 && errno==ECHILD )
       { /* child exited, no return code */
       err = 0;

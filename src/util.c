@@ -3237,6 +3237,46 @@ int AsyncRunCommandNoIO( char* cmd )
   return 0;
   }
 
+int SyncRunCommandNoIO( char* cmd )
+  {
+  if( EMPTY( cmd ) )
+    return -1;
+
+  NARGV* args = nargv_parse( cmd );
+  if( args==NULL )
+    Error( "Failed to parse cmd line [%s]", cmd );
+
+  pid_t pid = fork();
+  if( pid<0 )
+    Error( "Failed to fork() - %d:%s", errno, strerror( errno ) );
+
+  if( pid == 0 ) /* child */
+    {
+    close( 0 );
+    close( 1 );
+    close( 2 );
+    (void)execv( args->argv[0], args->argv );
+    /* end of code */
+    }
+
+  nargv_free( args );
+
+  int retVal = 0;
+  int wStatus;
+  if( waitpid( pid, &wStatus, 0 )==-1 )
+    {
+    Warning( "waitpid returned -1 (error.  errno=%d/%s).\n", errno, strerror( errno ));
+    retVal = -1;
+    }
+
+  if( WIFEXITED( wStatus ) )
+    {
+    Notice( "child exited.\n");
+    }
+
+  return retVal;
+  }
+
 void SignalHandler( int signo )
   {
   if( signo == SIGHUP )
