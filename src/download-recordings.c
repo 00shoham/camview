@@ -371,7 +371,7 @@ char* ExecuteDownload( int* cameras,
 
   if( NOTEMPTY( listFileName ) )
     {
-    unlink( listFileName );
+    /* unlink( listFileName ); */
     }
 
   return strdup( status );
