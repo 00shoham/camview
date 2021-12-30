@@ -16,7 +16,6 @@ WEBDOCS=\
   right-small.png
 
 BIN=\
-  test-filelock\
   cam-monitor\
   cam-archive\
   cam-config\
@@ -24,7 +23,6 @@ BIN=\
   imagediff\
   brightenimage\
   testimagelist\
-  crashtest\
   $(WEBBIN)
 
 USER=nobody
@@ -36,20 +34,18 @@ WEBLOG=/mnt/ramdisk/security/cgi.log
 
 all: $(BIN)
 
+UTILDIR=../../utils/src
+UTILSLIB=$(UTILDIR)/utils.a
+
 CC=gcc
-# CFLAGS=-Wall -g -rdynamic -fsanitize=address
-CFLAGS=-Wall -O2
+# CFLAGS=-Wall -g -rdynamic -fsanitize=address -I$(UTILDIR)
+CFLAGS=-Wall -O2 -I$(UTILDIR)
 LIBS=-ljpeg -lpthread -lm -luuid
 SHAREDOBJ=\
   cgi.o\
   config.o\
-  daemon.o\
-  error.o\
-  util.o\
-  ping.o\
   image.o\
   camera.o\
-  nargv.o\
   filenames.o\
   jpeg.o\
 
@@ -64,8 +60,8 @@ stop: NULL
 	chmod 755 ./stop.sh
 	./stop.sh
 
-$(BIN): % : %.o $(SHAREDOBJ)
-	$(CC) $(CFLAGS) -o $@ $< $(SHAREDOBJ) $(LIBS)
+$(BIN): % : %.o $(SHAREDOBJ) $(UTILSLIB)
+	$(CC) $(CFLAGS) -o $@ $< $(SHAREDOBJ) $(UTILSLIB) $(LIBS)
 
 clean: NULL
 	rm -f $(SHAREDOBJ) $(BIN)

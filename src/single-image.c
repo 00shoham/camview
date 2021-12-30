@@ -471,8 +471,8 @@ int main( int argc, char** argv )
            CONFIGNAME );
     }
 
-  config->logFileHandle = fopen( config->cgiLogFile, "a" );
-  if( config->logFileHandle==NULL )
+  logFileHandle = fopen( config->cgiLogFile, "a" );
+  if( logFileHandle==NULL )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "Failed to open %s", config->cgiLogFile );
@@ -480,7 +480,7 @@ int main( int argc, char** argv )
 
   CGIBody();
 
-  fclose( config->logFileHandle );
+  fclose( logFileHandle );
 
   return 0;
   }

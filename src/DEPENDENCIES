@@ -9,4 +9,8 @@ You need the following packages:
   * ffmpeg
     (apt install ffmpeg)
 
+You also need to install https://github.com/00shoham/idanlib.
 
+Once you've got and built that, you will need to modify Makefile
+to specify the path to src/ in that repo.  A bunch of utility
+fucntions from there are used here.

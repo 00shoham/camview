@@ -64,10 +64,10 @@ void FreeConfig( _CONFIG* config )
   FreeIfAllocated( &(config->cgiLogFile) );
   FreeIfAllocated( &(config->configName) );
 
-  if( config->logFileHandle!=NULL )
+  if( logFileHandle!=NULL )
     {
-    fclose( config->logFileHandle );
-    config->logFileHandle = NULL;
+    fclose( logFileHandle );
+    logFileHandle = NULL;
     }
 
   if( config->list )

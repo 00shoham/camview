@@ -19,7 +19,7 @@ int main( int argc, char** argv )
   config = (_CONFIG*)calloc(1, sizeof(_CONFIG) );
   glob_conf = config;
 
-  glob_conf->logFileHandle = stdout;
+  logFileHandle = stdout;
 
   char* input = NULL;
   char* output = NULL;

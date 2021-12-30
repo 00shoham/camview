@@ -26,7 +26,7 @@ int main( int argc, char** argv )
   config = (_CONFIG*)calloc(1, sizeof(_CONFIG) );
   glob_conf = config;
 
-  glob_conf->logFileHandle = stdout;
+  logFileHandle = stdout;
 
   int width = 500;
   char* image1 = NULL;

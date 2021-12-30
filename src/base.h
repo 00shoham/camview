@@ -3,72 +3,21 @@
 
 #define _GNU_SOURCE
 
-#include <stdio.h>
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <dirent.h>
-#include <time.h>
-#include <sys/time.h>
-#include <regex.h>
-#include <ctype.h>
-#include <locale.h>
-#include <pwd.h>
-#include <grp.h>
-#include <signal.h>
-#include <sys/stat.h>
-#include <syslog.h>
-#include <errno.h>
+#include "utils.h"
 #include <jpeglib.h>
-#include <math.h>
-#include <pthread.h>
-#include <execinfo.h>
 
 #define LOG_FILES_TO_KEEP 10
 
-#define INVALID_INT -999999
-#define INVALID_DOUBLE -99999.0
-
-enum callMethod { cm_invalid, cm_ui, cm_api };
-
-#define DEFAULT_USER_ENV_VAR "REMOTE_USER"
-
-void Error( char* fmt, ... );
-void Warning( char* fmt, ... );
-void Notice( char* fmt, ... );
-void SegFaultHandler( int signo );
-
-#define HEXDIGITS "0123456789abcdefABCDEF"
-
 #define MAX_LAUNCH_ATTEMPTS 3
 
-#define BIGBUF 500000
-#define BUFLEN 2000
 #define CONFIGDIR "."
 #define CONFIGNAME "config.ini"
 #define ALTCONFIGNAME "/usr/local/etc/cam-view/config.ini"
 #define CONFIGLOCAL "config.local"
-#define DF_COMMAND "/bin/df %PATH% | /bin/grep -v '^Filesystem' | /usr/bin/awk '{print $4}'"
-
-#define RE_EMAIL_ADDRESS "[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,4}"
-#define RE_EMAIL_DOMAIN "[A-Za-z0-9.-]+\\.[A-Za-z]{2,4}"
-#define RE_INTEGER "[-]?[0-9]+"
-#define RE_IDENTIFIER "[0-9a-zA-Z_.-]+"
-#define RE_WORDS "[a-zA-Z0-9 ]+"
-#define RE_SENTENCE "[a-zA-Z0-9 ,.?:/()-]+"
-#define RE_TEXTBLOCK "[a-zA-Z0-9 ,.?:/=<>()\n-]+"
-#define RE_IPADDR "[0-9][0-9]?[0-9]?\\.[0-9][0-9]?[0-9]?\\.[0-9][0-9]?[0-9]?\\.[0-9][0-9]?[0-9]?"
-#define RE_DATE "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]"
-#define RE_TIME "[0-9][0-9]:[0-9][0-9]:[0-9][0-9]"
-#define RE_TIME_NOSEC "[0-9][0-9]:[0-9][0-9]"
 
 #define VALIDFILECHARS "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_."
 #define VALIDPATHCHARS "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ-_./"
-#define REPLACEMENTCHAR '-'
+
 #define SETTLING_TIME 90 /* max seconds between images */
 #define IMAGE_TOO_OLD 60*5 /* we keep getting the same file */
 #define MINIMUM_CAPTURE_INTERVAL 5*60 /* seconds between mandatory image captures */
@@ -118,13 +67,12 @@ void SegFaultHandler( int signo );
 #define MAX_BACK 20
 #define MAX_FORWARD 20
 
-#include "util.h"
-#include "nargv.h"
+struct _config;
+typedef struct _config _CONFIG;
+
 #include "image.h"
 #include "camera.h"
 #include "config.h"
-#include "daemon.h"
-#include "ping.h"
 #include "cgi.h"
 #include "filenames.h"
 #include "jpeg.h"

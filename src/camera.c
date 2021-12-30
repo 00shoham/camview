@@ -139,7 +139,7 @@ void StopCaptureProcesses()
 void TerminateMonitor( int signo )
   {
   if( glob_conf!=NULL
-      && glob_conf->logFileHandle!=NULL )
+      && logFileHandle!=NULL )
     {
     Warning("Caught signal %d - terminating.", signo);
     }

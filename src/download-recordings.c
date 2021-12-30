@@ -377,7 +377,7 @@ char* ExecuteDownload( int* cameras,
   return strdup( status );
   }
 
-int ValidateDownloadForm( _CONFIG* conf, _CGI_HEADER *h )
+int ValidateDownloadForm( _CGI_HEADER *h )
   {
   int status = 0;
   char nowDateBuf[20];
@@ -466,7 +466,7 @@ void CGIBody()
   char* earliestDate = DateStr( tearliest, earliestDateBuf, sizeof( earliestDateBuf ) );
 
   _CGI_HEADER h;
-  int err = ParsePostData( glob_conf, stdin, &h, ValidateDownloadForm );
+  int err = ParsePostData( stdin, &h, ValidateDownloadForm );
 
   if( err==0 && h.headers!=NULL )
     { /* successful form post */
@@ -718,8 +718,8 @@ int main( int argc, char** argv )
            CONFIGNAME );
     }
 
-  config->logFileHandle = fopen( config->cgiLogFile, "a" );
-  if( config->logFileHandle==NULL )
+  logFileHandle = fopen( config->cgiLogFile, "a" );
+  if( logFileHandle==NULL )
     {
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error( "Failed to open %s", config->cgiLogFile );
@@ -737,7 +737,7 @@ int main( int argc, char** argv )
     CGIBody();
     }
 
-  fclose( config->logFileHandle );
+  fclose( logFileHandle );
 
   return 0;
   }

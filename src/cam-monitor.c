@@ -3,7 +3,7 @@
 extern int glob_argc;
 extern char** glob_argv;
 extern _CONFIG* glob_conf;
-extern int useMutex;
+extern int useMutexInErrorReporting;
 
 void SendPeriodicHangup( pid_t monitorPid, int interval )
   {
@@ -22,7 +22,7 @@ void SendPeriodicHangup( pid_t monitorPid, int interval )
 
 int main( int argc, char** argv )
   {
-  useMutex = 1;
+  useMutexInErrorReporting = 1;
 
   glob_argc = argc;
   glob_argv = argv;
@@ -84,13 +84,29 @@ int main( int argc, char** argv )
   if( ! consoleOnly )
     {
     childProcess = LaunchDaemon( 0 );
+    if( childProcess==0 ) /* in child */
+      {
+      /* try to connect to the cameras again */
+      (void)signal( SIGHUP, PingCameras );
+
+      /* shut down child processes if we get killed */
+      (void)signal( SIGINT, TerminateMonitor );
+      (void)signal( SIGQUIT, TerminateMonitor );
+      (void)signal( SIGKILL, TerminateMonitor );
+      (void)signal( SIGTERM, TerminateMonitor );
+
+      /* for debugging */
+      (void)signal( SIGSEGV, MySegFaultHandler );
+      }
     }
 
   if( consoleOnly || childProcess==0 ) /* worker process */
     {
     if( NOTEMPTY( config->logFile ) )
       {
-      config->logFileHandle = fopen( config->logFile, "a" );
+      Notice( "Opening log file %s", config->logFile );
+      logFileHandle = fopen( config->logFile, "a" );
+      Notice( "Log file handle is %p", logFileHandle );
       }
 
     Notice( "***************" );
