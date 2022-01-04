@@ -34,7 +34,7 @@ WEBLOG=/mnt/ramdisk/security/cgi.log
 
 all: $(BIN)
 
-UTILDIR=../../utils/src
+UTILDIR=../../idanlib/src
 UTILSLIB=$(UTILDIR)/utils.a
 
 CC=gcc
