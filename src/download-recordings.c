@@ -314,6 +314,7 @@ char* ExecuteDownload( int* cameras,
     {
     char cmd[BUFLEN];
 
+    /*
     snprintf( cmd, sizeof(cmd)-1,
               "cat `cat %s`"
               " | /usr/bin/ffmpeg -y"
@@ -323,8 +324,20 @@ char* ExecuteDownload( int* cameras,
               " '%s'",
               listFileName,
               archiveFile );
+    */
+    snprintf( cmd, sizeof(cmd)-1,
+              "/usr/bin/ffmpeg -y"
+              " -framerate 1 "
+              " -f image2pipe -i -"
+              " -pix_fmt yuv420p"
+              " '%s'",
+              archiveFile );
+
     Notice("Running - %s", cmd );
-    err = SyncRunCommandNoIO( cmd );
+    /*
+    err = SyncRunShellNoIO( cmd );
+    */
+    err = SyncRunCommandManyFilesStdin( cmd, listFileName );
     if( err==-1 && errno==ECHILD )
       { /* child exited, no return code */
       err = 0;
@@ -665,7 +678,7 @@ void TryToSendFileByGuid( char* guid )
         else
           {
           CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
-          Error( "File [%s] no longer exists.", filePath );
+          Error( "The file [%s] could not be found (expired?).", filePath );
           }
         }
       }
