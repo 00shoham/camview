@@ -4,8 +4,6 @@
 #define DEBUG 1
 */
 
-FILE* debugOutput = NULL;
-
 void DumpJPEGToBrowser( char* nickName, long nBytes, char* fileName )
   {
   FILE* f = fopen( fileName, "r" );

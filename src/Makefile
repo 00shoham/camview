@@ -32,14 +32,19 @@ HTMLDIR=/var/www/html
 #STAGEDIR=/var/www/stage
 WEBLOG=/mnt/ramdisk/security/cgi.log
 
+LUADIR := $(shell /usr/bin/find /usr/include -type d -name 'lua*' | sort | tail -1)
+LUAPARTS := $(subst /, ,$(LUADIR))
+LUAVER := $(lastword $(LUAPARTS))
+INCLUDES=-I$(LUADIR)
+
 all: $(BIN)
 
 UTILDIR=../../idanlib/src
 UTILSLIB=$(UTILDIR)/utils.a
 
 CC=gcc
-# CFLAGS=-Wall -g -rdynamic -fsanitize=address -I$(UTILDIR)
-CFLAGS=-Wall -O2 -I$(UTILDIR)
+# CFLAGS=-Wall -g -rdynamic -fsanitize=address -I$(UTILDIR) $(INCLUDES)
+CFLAGS=-Wall -O2 -I$(UTILDIR) $(INCLUDES)
 LIBS=-ljpeg -lpthread -lm -luuid
 SHAREDOBJ=\
   cgi.o\
