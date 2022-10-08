@@ -1,6 +1,6 @@
 #!/bin/sh
 
-BINS=\
+BINS="\
   brightenimage\
   cam-archive\
   cam-config\
@@ -11,6 +11,8 @@ BINS=\
   imagediff\
   jpegtest\
   single-image\
-  testimagelist\
+  testimagelist"
 
-cp $(BINS) ../../v/src
+for f in $BINS; do
+  cp $f ../../v/src
+done
