@@ -30,6 +30,9 @@ void SetDefaults( _CONFIG* config )
 
 void FreeConfig( _CONFIG* config )
   {
+  if( config->groups!=NULL )
+    FreeGroups( config->groups );
+
   _CAMERA* cam = config->cameras;
   while( cam!=NULL )
     {
@@ -141,7 +144,17 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
     config->list = NewTagValue( variable, value, config->list, 1 );
 
     /* printf("ProcessConfigLine( %s, %s )\n", variable, value ); */
-    if( strcasecmp( variable, "CAMERA" )==0 )
+    if( strcasecmp( variable, "GROUP" )==0 )
+      {
+      config->groups = NewGroup( value, config->groups );
+      }
+    else if( strcasecmp( variable, "MEMBER" )==0 )
+      {
+      if( config->groups==NULL )
+        Error( "%s must follow GROUP", variable );
+      config->groups->members = NewMember( value, config->groups->members );
+      }
+    else if( strcasecmp( variable, "CAMERA" )==0 )
       {
       _CAMERA* cam = (_CAMERA*)calloc(1,sizeof(_CAMERA));
       SetDefaultsSingleCamera( config, cam  );
@@ -151,6 +164,14 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
 
       FreeIfAllocated( &( config->cameras->nickName ) );
       config->cameras->nickName = strdup( value );
+      }
+    else if( strcasecmp( variable, "ACCESS" )==0 )
+      {
+      if( config->groups==NULL )
+        Error( "You cannot use ACCESS without first defining at least one GROUP" );
+      if( config->cameras==NULL )
+        Error("%s cannot precede CAMERA in config", variable );
+      config->cameras->access = NewGroupPointer( value, config->groups, config->cameras->access );
       }
     else if( strcasecmp( variable, "COMMAND" )==0 )
       {
@@ -541,12 +562,28 @@ void PrintConfig( FILE* f, _CONFIG* config )
            config->nCameras>1 ? "s" : ""
           );
 
+  int g=0;
+  for( _GROUP* group = config->groups; group!=NULL; group=group->next )
+    {
+    fprintf( f, "\n" );
+    fprintf( f, "# Group %d\n", g );
+    fprintf( f, "GROUP=%s\n", NULLPROTECT( group->id ) );
+    for( _MEMBER* member = group->members; member!=NULL; member=member->next )
+      fprintf( f, "MEMBER=%s\n", NULLPROTECT( member->id ) );
+    ++g;
+    }
+
   int i=0;
   for( _CAMERA* cam = config->cameras; cam!=NULL; cam=cam->next )
     {
     fprintf( f, "\n" );
     fprintf( f, "# Camera %d\n", i );
     fprintf( f, "CAMERA=%s\n", NULLPROTECT(cam->nickName) );
+
+    for( _GROUP_POINTER* gp = cam->access; gp!=NULL; gp=gp->next )
+      if( gp->group!=NULL && NOTEMPTY( gp->group->id ) )
+        fprintf( f, "ACCESS=%s\n", gp->group->id );
+
     fprintf( f, "COMMAND=%s\n", NULLPROTECT(cam->captureCommand) );
     if( cam->debug )
       {

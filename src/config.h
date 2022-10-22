@@ -7,6 +7,8 @@ typedef struct _config
   _TAG_VALUE* parserLocation;
 
   char* configName;
+
+  _GROUP* groups;
   int nCameras;
   _CAMERA* cameras;
   char* baseDir;

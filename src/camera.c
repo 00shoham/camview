@@ -39,6 +39,9 @@ void FreeCamera( _CAMERA* cam )
   FreeIfAllocated( &(cam->lastStoredImage) );
   FreeIfAllocated( &(cam->lastImageSourceName) );
 
+  if( cam->access!=NULL )
+    FreeGroupPointers( cam->access );
+
   (void)pthread_mutex_destroy( &(cam->lock) );
 
   FREE( cam );
