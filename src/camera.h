@@ -30,6 +30,8 @@ typedef struct _camera
   pthread_t motionDetectThread;
   int debug;
 
+  _GROUP_POINTER* access;
+
   /* brighten the image first, if it's too dark */
   int color_dark;
   double dark_brightness_boost;

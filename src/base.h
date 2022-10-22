@@ -71,6 +71,7 @@ struct _config;
 typedef struct _config _CONFIG;
 
 #include "image.h"
+#include "access.h"
 #include "camera.h"
 #include "config.h"
 #include "cgi.h"

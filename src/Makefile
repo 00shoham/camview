@@ -47,6 +47,7 @@ CC=gcc
 CFLAGS=-Wall -O2 -I$(UTILDIR) $(INCLUDES)
 LIBS=-ljpeg -lpthread -lm -luuid
 SHAREDOBJ=\
+  access.o\
   cgi.o\
   config.o\
   image.o\
