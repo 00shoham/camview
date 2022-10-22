@@ -301,6 +301,9 @@ void CGIBody()
     {
     /* Notice("query string = %s", query ); */
     }
+
+  char* whoAmI = ExtractUserIDOrDie( cm_api, glob_conf->userEnvVar );
+
   char* term = NULL;
   char* internal = NULL;
   for( term = strtok_r( query, "&", &internal );
@@ -377,6 +380,9 @@ void CGIBody()
     CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
     Error("No camera. Aborting.");
     }
+
+  if( IsUserInGroups( whoAmI, cam->access )!=0 )
+    Error("Access denied (user %s, camera %s)", whoAmI, NULLPROTECT( cam->nickName ) );
 
   CameraBackupFolder( glob_conf, cam );
   if( EMPTY( cam->backupFolderPath ) )

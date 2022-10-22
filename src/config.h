@@ -8,6 +8,7 @@ typedef struct _config
 
   char* configName;
 
+  char* userEnvVar;
   _GROUP* groups;
   int nCameras;
   _CAMERA* cameras;

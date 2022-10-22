@@ -14,9 +14,14 @@ void CGIBody()
   strcpy( ptr, "var cameras = [];\n" );
   ptr += strlen( ptr );
 
+  char* whoAmI = ExtractUserIDOrDie( cm_api, glob_conf->userEnvVar );
+
   int cameraNum = 0;
   for( _CAMERA* cam=glob_conf->cameras; cam!=NULL; cam=cam->next )
     {
+    if( IsUserInGroups( whoAmI, cam->access )!=0 )
+      continue;
+
     if( EMPTY( cam->nickName ) )
       {
       Error( "Camera %d has no nickname", cameraNum );
@@ -30,7 +35,7 @@ void CGIBody()
 
   if( cameraNum==0 )
     {
-    Error( "No cameras found in configuration file" );
+    Error( "No cameras found in configuration file and/or accessible to %s", whoAmI );
     }
 
   snprintf( ptr, end-ptr, "var nCams = %d;\n", cameraNum );

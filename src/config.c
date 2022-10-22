@@ -26,10 +26,13 @@ void SetDefaults( _CONFIG* config )
   config->checkerboard_num_white = DEFAULT_CHECKERBOARD_NUM_WHITE;
   config->checkerboard_percent = DEFAULT_CHECKERBOARD_PERCENT;
   config->hup_interval = DEFAULT_HUP_INTERVAL;
+  config->userEnvVar = strdup( DEFAULT_USER_ENV_VAR );
   }
 
 void FreeConfig( _CONFIG* config )
   {
+  FreeIfAllocated( &(config->userEnvVar) );
+
   if( config->groups!=NULL )
     FreeGroups( config->groups );
 
@@ -153,6 +156,11 @@ void ProcessConfigLine( char* ptr, char* equalsChar, _CONFIG* config )
       if( config->groups==NULL )
         Error( "%s must follow GROUP", variable );
       config->groups->members = NewMember( value, config->groups->members );
+      }
+    else if( strcasecmp( variable, "USER_ENV_VARIABLE" )==0 )
+      {
+      FreeIfAllocated( &(config->userEnvVar) );
+      config->userEnvVar = strdup( value );
       }
     else if( strcasecmp( variable, "CAMERA" )==0 )
       {

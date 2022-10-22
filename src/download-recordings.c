@@ -452,6 +452,8 @@ void CGIBody()
   char* end = status + sizeof(status)-1;
   *ptr = 0;
   */
+  char* whoAmI = ExtractUserIDOrDie( cm_api, glob_conf->userEnvVar );
+
   int* cameras = NULL;
   int nCameras = CountCameras( glob_conf );
   if( nCameras<1 )
@@ -511,6 +513,9 @@ void CGIBody()
     int numCamSelected = 0;
     for( _CAMERA* cam = glob_conf->cameras; cam!=NULL; cam=cam->next )
       {
+      if( IsUserInGroups( whoAmI, cam->access )!=0 )
+        continue;
+
       if( EMPTY( cam->nickName ) )
         {
         CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
@@ -566,6 +571,9 @@ void CGIBody()
   int camNum = 0;
   for( _CAMERA* cam = glob_conf->cameras; cam!=NULL; cam=cam->next )
     {
+    if( IsUserInGroups( whoAmI, cam->access )!=0 )
+      continue;
+
     int checked = cameras[camNum];
     snprintf( camPtr, camEndPtr-camPtr-1,
               "              <input type=checkbox id=\"cam-%s\" name=\"camera\" value=\"%s\"%s/>\n",
