@@ -119,6 +119,8 @@ int main( int argc, char** argv )
   SetDefaults( config );
   ReadConfig( config, confName );
 
+  char* whoAmI = ExtractUserIDOrDie( cm_api, glob_conf->userEnvVar );
+
   char cameras[BIGBUF];
   char* ptr = cameras;
   char* end = ptr + sizeof( cameras ) - 1;
@@ -132,6 +134,10 @@ int main( int argc, char** argv )
       {
       Error( "Camera %d has no nickname", cameraNum );
       }
+
+    if( IsUserInGroups( whoAmI, cam->access )!=0 )
+      continue;
+
     snprintf( ptr, end-ptr,
               "cameras[%d] = { name:\"%s\", imageFilename:\"\" };\n",
               cameraNum, cam->nickName );
@@ -203,6 +209,9 @@ int main( int argc, char** argv )
 
   for( _CAMERA* cam=config->cameras; cam!=NULL; cam=cam->next )
     {
+    if( IsUserInGroups( whoAmI, cam->access )!=0 )
+      continue;
+
     int problemsThisCamera = 0;
     printf( "<div class=\"camera\">Camera: %s\n", NULLPROTECT( cam->nickName ) );
     if( EMPTY( cam->nickName ) )

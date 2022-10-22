@@ -7,7 +7,10 @@ extern _CONFIG* glob_conf;
 
 void Usage( char* cmd, int exitCode )
   {
-  printf("USAGE: %s [-listincludes] -c CONFIGFILE [-printvar VARNAME]\n", cmd );
+  printf( "USAGE: %s- c CONFIGFILE\n", cmd );
+  printf( "  [-listincludes]\n" );
+  printf( "  [-acltest USERID CAMERAID]\n" );
+  printf( "  [-printvar VARNAME]\n" );
 
   exit( exitCode);
   }
@@ -52,6 +55,23 @@ int main( int argc, char** argv )
     else if( strcmp( argv[i], "-listincludes" )==0 )
       {
       config->listIncludes = 1;
+      }
+    else if( strcmp( argv[i], "-acltest" )==0
+             && i+2<argc )
+      {
+      ++i;
+      char* userID = argv[i];
+      ++i;
+      char* cameraID = argv[i];
+
+      _CAMERA* cam = FindCamera( config, cameraID );
+      if( cam==NULL )
+        Error( "Cannot find camera %s", cameraID );
+
+      if( IsUserInGroups( userID, cam->access )==0 )
+        printf( "Access to camera %s GRANTED to user %s\n", cameraID, userID );
+      else
+        printf( "Access to camera %s DENIED to user %s\n", cameraID, userID );
       }
     else if( strcmp( argv[i], "-h" )==0
              || strcmp( argv[i], "-help" )==0 )
