@@ -20,6 +20,7 @@ fi
 
 AVAIL=`df -h $RAMDISK\
   | awk '{print $4}'\
+  | tr -d '[:alpha:]'\
   | tail -1`
 
 if [ $AVAIL -eq "0" ]; then
