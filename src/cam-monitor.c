@@ -22,6 +22,8 @@ void SendPeriodicHangup( pid_t monitorPid, int interval )
 
 int main( int argc, char** argv )
   {
+  KillEarlierInstancesOfThisProcess( argc, argv, SIGQUIT );
+
   useMutexInErrorReporting = 1;
 
   glob_argc = argc;
