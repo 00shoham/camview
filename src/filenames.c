@@ -1,5 +1,7 @@
 #include "base.h"
 
+#define DEBUG 1
+
 _FILENAME* NewFilename( char* name, _FILENAME* list )
   {
   if( EMPTY( name ) )
