@@ -113,7 +113,7 @@ void KillCameraProcess( _CAMERA* cam )
   cam->launchAttempts = 0;
   cam->lastImageCount = 0;
 
-  KillExistingCommandInstances( cam->captureCommand );
+  KillExistingCommandInstances( cam->captureCommand, SIGHUP );
 
   CleanCameraFolder( cam );
 
@@ -365,7 +365,7 @@ pid_t LaunchCapture( _CONFIG* config, _CAMERA* cam )
   /* printf("forking %s\n", cam->nickName ); */
   Notice("Forking and running %s", cam->captureCommand );
 
-  KillExistingCommandInstances( cam->captureCommand );
+  KillExistingCommandInstances( cam->captureCommand, SIGHUP );
 
   pid_t child = fork();
 
