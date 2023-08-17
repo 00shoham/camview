@@ -704,6 +704,8 @@ int main( int argc, char** argv )
   config = (_CONFIG*)calloc(1, sizeof(_CONFIG) );
   glob_conf = config;
 
+  inCGI = 1;
+
   char* confName = CONFIGNAME;
   if( FileExists( confName )!=0 )
     {
