@@ -329,7 +329,6 @@ char* ExecuteDownload( int* cameras,
               "/usr/bin/ffmpeg -y"
               " -framerate 1 "
               " -f image2pipe -i -"
-              " -pix_fmt yuv420p"
               " '%s'",
               archiveFile );
 
