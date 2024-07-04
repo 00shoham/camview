@@ -25,6 +25,7 @@ void Usage( char* cmd )
   printf( "  Optional: -checkerboard_min_white INT\n" );
   printf( "  Optional: -checkerboard_num_white INT\n" );
   printf( "  Optional: -checkerboard_percent FLOAT\n" );
+  printf( "  Optional: -debug\n" );
   printf( "  Optional: -h\n");
   exit(0);
   }
@@ -50,11 +51,11 @@ int main( int argc, char** argv )
   glob_argc = argc;
   glob_argv = argv;
 
+  int doDebug = 0;
+
   _CONFIG* config = NULL;
   config = (_CONFIG*)calloc(1, sizeof(_CONFIG) );
   glob_conf = config;
-
-  logFileHandle = stdout;
 
   int width = 500;
   char* image1 = NULL;
@@ -77,7 +78,11 @@ int main( int argc, char** argv )
 
   for( int i=1; i<argc; ++i )
     {
-    if( strcmp( argv[i], "-image1" )==0 && i+1<argc )
+    if( strcmp( argv[i], "-debug" )==0 )
+      {
+      ++ doDebug;
+      }
+    else if( strcmp( argv[i], "-image1" )==0 && i+1<argc )
       {
       ++i;
       image1 = argv[i];
@@ -176,6 +181,9 @@ int main( int argc, char** argv )
       }
     }
 
+  if( doDebug )
+    logFileHandle = stdout;
+
   if( image1 == NULL ) Error( "You must specify -image1" );
   if( image2 == NULL ) Error( "You must specify -image2" );
 
@@ -191,7 +199,7 @@ int main( int argc, char** argv )
   _IMAGE* img2 = ImageFromJPEGFile( "imagediff", image2 );
 
   int motion = HasImageChanged(
-                 0,
+                 doDebug,
                  "imagediff", img1, img2,
                  color_dark,
                  dark_brightness_boost,
