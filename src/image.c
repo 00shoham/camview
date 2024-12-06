@@ -366,12 +366,11 @@ int HasImageChanged( int debug,
 
   ImageSubtractAbsoluteWithThresholdAndNeighbours( inputA, inputB,
                                                    diffImage, color_diff_threshold );
-  /*
   if( debug )
-    {
-    Notice( "Calculated diff between %s/%s and %s", nickName, imageA, imageB );
-    }
-  */
+    Notice( "Calculated diff between %s/%s and %s", nickName, inputA->fileName, inputB->fileName );
+
+  if( debug>1 )
+    err = CompressJPEG( diffImage, "/tmp/1-diff.jpg", JPEG_WRITE_IMAGEQUALITY );
 
   /* remove white dots on dark background and dark dots on light background
      from the grayscale diff image - that's just noise */
@@ -384,14 +383,16 @@ int HasImageChanged( int debug,
              despeckle_bright_threshold,
              despeckle_nonbright_max );
 
-  /*
+  if( debug>1 )
+    err = CompressJPEG( cleanDiffImage, "/tmp/2-despeckled-diff.jpg", JPEG_WRITE_IMAGEQUALITY );
+
   if( debug )
     {
-    int luminosityD = AverageImageLuminosity( cleanDiffImage, widthA, heightA, 1 );
-    Notice( "%s/%s and %s yield a 'spotless' diff with %3d average luminosity",
-            nickName, imageA, imageB, luminosityD );
+    int luminosityD = AverageImageLuminosity( cleanDiffImage );
+    Notice( "%s/%s and %s yield a despeckled diff with %3d average luminosity",
+            nickName, inputA->fileName, inputB->fileName, luminosityD );
     }
-  */
+
 
   if( NOTEMPTY( diffImageName ) )
     {
@@ -424,13 +425,14 @@ int HasImageChanged( int debug,
                            checkerboard_square_size,
                            checkerboard_minwhite,
                            checkerboard_numwhite );
-  /*
   if( debug )
     {
     Notice( "Generated %d/%d checkerboard of diff (%s/%s - %s)",
-            cbWidth, cbHeight, nickName, imageA, imageB );
+            checkerBoard->width, checkerBoard->height, nickName, inputA->fileName, inputB->fileName );
     }
-  */
+
+  if( debug>1 )
+    err = CompressJPEG( checkerBoard, "/tmp/3-checkerboard.jpg", JPEG_WRITE_IMAGEQUALITY );
 
   if( NOTEMPTY( cbImageName ) )
     {
@@ -460,12 +462,8 @@ int HasImageChanged( int debug,
   if( calculatedScore!=NULL )
     {
     *calculatedScore = cbPercent;
-    /*
     if( debug )
-      {
       Notice( "Returned calculated score to caller" );
-      }
-    */
     }
 
   FreeImage( &checkerBoard );
