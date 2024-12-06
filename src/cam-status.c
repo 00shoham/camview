@@ -102,6 +102,16 @@ int main( int argc, char** argv )
     Error( "Cannot locate %s or %s", CONFIGNAME, ALTCONFIGNAME );
     }
 
+  char folder[BUFLEN];
+  char* fPath = GetFolderFromPath( argv[0], folder, sizeof(folder)-5 );
+  int chErr = chdir( fPath );
+  if( chErr )
+    {
+    CGIHeader( NULL, 0, NULL, 0, NULL, 0, NULL);
+    Error( "Cannot chdir to [%s] (%d:%d:%s)",
+      NULLPROTECT( fPath ), chErr, errno, strerror( errno ) );
+    }
+
   for( int i=1; i<argc; ++i )
     {
     if( strcmp( argv[i], "-c" )==0 && i+1<argc )

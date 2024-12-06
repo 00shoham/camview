@@ -44,7 +44,11 @@ void CGIBody()
   long templateLen = FileRead( CAMVIEW_TEMPLATE, (unsigned char**)&template );
   if( templateLen<=0 )
     {
-    Error( "Cannot open template page %s", CAMVIEW_TEMPLATE );
+    char mydir[BUFLEN];
+    if( getcwd( mydir, sizeof(mydir)-5 )!=mydir )
+      Error( "Cannot get CWD" );
+    else
+      Error( "Cannot open template page %s (cwd=%s; argv0=%s)", CAMVIEW_TEMPLATE, mydir, glob_argv[0] );
     }
 
   char* confName = DEFAULT_CONF_NAME;
@@ -75,6 +79,13 @@ int main( int argc, char** argv )
   glob_argv = argv;
 
   CGIHeader( "text/html", 0, CAMVIEW_TITLE, 0, NULL, 0, NULL);
+
+  char folder[BUFLEN];
+  char* fPath = GetFolderFromPath( argv[0], folder, sizeof(folder)-5 );
+  int chErr = chdir( fPath );
+  if( chErr )
+    Error( "Cannot chdir to [%s] (%d:%d:%s)",
+           NULLPROTECT( fPath ), chErr, errno, strerror( errno ) );
 
   _CONFIG* config = NULL;
   config = (_CONFIG*)calloc(1, sizeof(_CONFIG) );
