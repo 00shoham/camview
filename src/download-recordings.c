@@ -113,9 +113,7 @@ char* LogDownload( char* filePath )
             glob_conf->downloadDir, FILENAME_DOWNLOADS );
   FILE* f = fopen( ledger, "a+" );
   if( f==NULL )
-    {
     Error( "Failed to open %s", ledger );
-    }
   fputs( entry, f );
   fclose( f );
 

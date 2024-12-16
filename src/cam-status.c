@@ -16,9 +16,7 @@ long GetMonitorPID()
   {
   FILE* f = popen( "/bin/ps -ef", "r" );
   if( f==NULL )
-    {
     Error( "Cannot run /bin/ps -ef" );
-    }
 
   long mainPid = -1;
   char buf[BUFLEN];
@@ -45,6 +43,7 @@ long GetMonitorPID()
       break;
       }
     }
+
   pclose( f );
 
   return mainPid;
@@ -54,9 +53,11 @@ int DoesProcessExist( long pid )
   {
   char cmd[BUFLEN];
   snprintf( cmd, sizeof(cmd)-1, "ps -p '%ld'", pid );
+
   FILE* f = popen( cmd, "r" );
   if( f==NULL )
     return -1;
+
   char buf[BUFLEN];
   char pids[BUFLEN];
   snprintf( pids, sizeof(pids)-1, "%ld", pid );
@@ -70,6 +71,7 @@ int DoesProcessExist( long pid )
       break;
       }
     }
+
   pclose( f );
 
   if( gotIt )
@@ -231,6 +233,7 @@ int main( int argc, char** argv )
     CameraFolder( config, cam ); /* does the chdir too */
     char pidFile[BUFLEN];
     snprintf( pidFile, sizeof(pidFile)-1, "%s.pid", cam->nickName );
+
     FILE* f = fopen( pidFile, "r" );
     if( f==NULL )
       {
@@ -239,6 +242,7 @@ int main( int argc, char** argv )
       ++problemsThisCamera;
       continue;
       }
+
     long pid = -1;
     if( fscanf( f, "%ld", &pid )!=1 )
       {
@@ -246,6 +250,7 @@ int main( int argc, char** argv )
       ++nProblems;
       ++problemsThisCamera;
       }
+
     fclose( f );
     f = NULL;
 
